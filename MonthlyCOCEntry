@@ -428,10 +428,9 @@
           <tr>
             <th class="px-3 py-2 text-left">Date</th>
             <th class="px-3 py-2 text-left">Day Type</th>
-            <!-- REMOVED: <th class="px-3 py-2 text-right">Hours</th> -->
-            <th class="px-3 py-2 text-right">COC Earned</th> <!-- MODIFIED: Renamed from COC -->
-            <th class="px-3 py-2 text-left">Monthly Certificate</th> <!-- MODIFIED: Changed header -->
-            <!-- REMOVED: Action Column -->
+            <th class="px-3 py-2 text-right">COC Earned</th>
+            <th class="px-3 py-2 text-left">Monthly Certificate</th>
+            <th class="px-3 py-2 text-center">Actions</th>
           </tr>
         </thead>
         <tbody id="existingRecordsBody" class="divide-y divide-gray-200"></tbody>
@@ -524,12 +523,46 @@
     </div>
   </div>
 
+  <!-- NEW: Delete Record Modal -->
+  <div class="modal-backdrop" id="deleteRecordModalBackdrop"></div>
+  <div class="modal" id="deleteRecordModal">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div class="bg-red-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Delete COC Record</h3>
+        <button id="closeDeleteRecordModalBtn" class="text-white hover:text-gray-200 transition-colors">
+          <i class="bi bi-x-lg text-xl"></i>
+        </button>
+      </div>
+      <div class="modal-body p-6">
+        <p class="text-sm text-gray-600 mb-4">Are you sure you want to delete this COC record? This action cannot be undone.</p>
+        <p class="text-sm font-medium text-gray-700 mb-2">Record Details:</p>
+        <div id="deleteRecordDetails" class="bg-gray-50 p-3 rounded mb-4 text-sm"></div>
+        <div>
+          <label for="deleteReasonInput" class="block text-sm font-medium text-gray-700 mb-1">
+            Reason for deletion <span class="text-red-500">*</span>
+          </label>
+          <textarea id="deleteReasonInput" rows="3" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder="Enter reason for deleting this record..."></textarea>
+          <p id="deleteReasonError" class="text-red-600 text-sm mt-1 hidden">Please provide a reason for deletion.</p>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex justify-end gap-3">
+        <button id="deleteRecordCancelBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
+          Cancel
+        </button>
+        <button id="deleteRecordConfirmBtn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+          Delete Record
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0/js/select2.min.js"></script>
   <script>
     let entries = [];
     let entryCounter = 0;
     let currentEmployeeStats = null;
+    let currentRecordToDelete = null;
 
     function showModal(title, body, type) {
       $('#modalTitle').text(title);
@@ -587,6 +620,56 @@
       $('#generateMonthlyCertBtn').prop('disabled', false).html('<i class="bi bi-file-earmark-plus"></i> Generate Monthly Certificate');
     }
 
+    // NEW: Delete Record Modal Functions
+    function showDeleteRecordModal(recordId, recordDetails) {
+      currentRecordToDelete = recordId;
+      $('#deleteRecordDetails').html(`
+        <p><strong>Date:</strong> ${recordDetails.displayDate}</p>
+        <p><strong>Day Type:</strong> ${recordDetails.dayType}</p>
+        <p><strong>COC Earned:</strong> ${recordDetails.cocEarned} hours</p>
+      `);
+      $('#deleteReasonInput').val('');
+      $('#deleteReasonError').addClass('hidden');
+      $('#deleteRecordModalBackdrop, #deleteRecordModal').addClass('show');
+    }
+
+    function closeDeleteRecordModal() {
+      $('#deleteRecordModalBackdrop, #deleteRecordModal').removeClass('show');
+      currentRecordToDelete = null;
+    }
+
+    function confirmDeleteRecord() {
+      const reason = $('#deleteReasonInput').val().trim();
+      if (!reason) {
+        $('#deleteReasonError').removeClass('hidden');
+        return;
+      }
+      $('#deleteReasonError').addClass('hidden');
+
+      const recordId = currentRecordToDelete;
+      if (!recordId) {
+        showModal('Error', 'No record selected for deletion.', 'danger');
+        closeDeleteRecordModal();
+        return;
+      }
+
+      const btn = $('#deleteRecordConfirmBtn');
+      btn.prop('disabled', true).html('<i class="bi bi-arrow-repeat animate-spin"></i> Deleting...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showModal('Success', 'COC record has been deleted successfully.', 'success');
+          btn.prop('disabled', false).html('Delete Record');
+          closeDeleteRecordModal();
+          loadExistingRecords(); // Refresh the table
+          updateEmployeeInfo(); // Refresh balance/stats
+        })
+        .withFailureHandler(function(error) {
+          showModal('Error', error && error.message ? error.message : String(error), 'danger');
+          btn.prop('disabled', false).html('Delete Record');
+        })
+        .apiDeleteCOCRecord(recordId, reason);
+    }
 
     function getDaysInMonth(month, year) {
       return new Date(year, month, 0).getDate();
@@ -1319,7 +1402,7 @@ window.cancelDuplicate = function() {
           }
 
           records.forEach(record => {
-            // MODIFIED: Certificate cell logic
+            // Certificate cell logic
             const certificateCell = record.certificateUrl
               ? `<div class="flex flex-col gap-1">
                    <a href="${record.certificateUrl}" target="_blank" class="text-indigo-600 hover:underline text-xs">
@@ -1331,20 +1414,37 @@ window.cancelDuplicate = function() {
                  </div>`
               : '<span class="badge badge-amber"><i class="bi bi-hourglass-split"></i> Awaiting Certificate</span>';
 
-            // REMOVED: actionCell logic
+            // Actions cell - only show for pending records (not yet certificated)
+            const actionsCell = !record.certificateUrl
+              ? `<div class="flex gap-2 justify-center">
+                   <button class="edit-record-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" data-record-id="${record.recordId}" title="Edit Record">
+                     <i class="bi bi-pencil-square"></i> Edit
+                   </button>
+                   <button class="delete-record-btn px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600" data-record-id="${record.recordId}" title="Delete Record">
+                     <i class="bi bi-trash"></i> Delete
+                   </button>
+                 </div>`
+              : '<span class="text-xs text-gray-400">Certificated</span>';
 
-            // MODIFIED: Row template to remove "Hours" cell
+            // Row template
             const row = $(`
               <tr>
                 <td class="px-3 py-2">${record.displayDate}</td>
                 <td class="px-3 py-2">${record.dayType || ''}</td>
-                <!-- REMOVED: <td class="px-3 py-2 text-right">${Number(record.hoursWorked || 0).toFixed(2)}</td> -->
                 <td class="px-3 py-2 text-right">${Number(record.cocEarned || 0).toFixed(2)}</td>
                 <td class="px-3 py-2">${certificateCell}</td>
+                <td class="px-3 py-2">${actionsCell}</td>
               </tr>
             `);
 
-            // REMOVED: .generate-cert-btn listener
+            // Attach event listeners for Edit and Delete buttons
+            row.find('.delete-record-btn').on('click', function() {
+              showDeleteRecordModal(record.recordId, record);
+            });
+
+            row.find('.edit-record-btn').on('click', function() {
+              showModal('Coming Soon', 'Edit functionality will be available soon. For now, you can delete and re-create the record.', 'info');
+            });
 
             body.append(row);
           });
@@ -1616,6 +1716,11 @@ window.cancelDuplicate = function() {
       $('#closeIssueDateModalBtn, #issueDateCancelBtn').on('click', closeIssueDateModal);
       $('#issueDateConfirmBtn').on('click', confirmCertificateGeneration);
       $('#issueDateModalBackdrop').on('click', closeIssueDateModal);
+
+      // NEW: Listeners for Delete Record Modal
+      $('#closeDeleteRecordModalBtn, #deleteRecordCancelBtn').on('click', closeDeleteRecordModal);
+      $('#deleteRecordConfirmBtn').on('click', confirmDeleteRecord);
+      $('#deleteRecordModalBackdrop').on('click', closeDeleteRecordModal);
 
     };
 

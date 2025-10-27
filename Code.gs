@@ -115,10 +115,64 @@ const TR_TYPE_USED = 'Used';
 const TR_TYPE_EXPIRED = 'Expired';
 const TR_TYPE_ADJUSTED = 'Adjusted';
 
+// -----------------------------------------------------------------------------
+// Migration Functions
+// -----------------------------------------------------------------------------
+
+/**
+ * MIGRATION: Populates MONTH_YEAR column for all COC_Records that have it empty.
+ * This is needed because older records were created without the MONTH_YEAR column,
+ * and the new apiListCOCRecordsForMonth function filters by this column.
+ *
+ * Run this function once to migrate old data.
+ */
+function migrateCOCRecordsMonthYear() {
+  try {
+    const db = SpreadsheetApp.openById(DATABASE_ID);
+    const recordsSheet = db.getSheetByName('COC_Records');
+
+    if (!recordsSheet) {
+      Logger.log('COC_Records sheet not found');
+      return { success: false, message: 'COC_Records sheet not found' };
+    }
+
+    const data = recordsSheet.getDataRange().getValues();
+    let updatedCount = 0;
+
+    // Start from row 2 (index 1) to skip header
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const monthYearValue = row[RECORD_COLS.MONTH_YEAR];
+      const dateRendered = row[RECORD_COLS.DATE_RENDERED];
+
+      // If MONTH_YEAR is empty and we have a DATE_RENDERED, populate it
+      if (!monthYearValue && dateRendered) {
+        const date = new Date(dateRendered);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const monthYear = `${year}-${month}`;
+
+          // Update the MONTH_YEAR column (column D, which is column 4, index 3+1)
+          recordsSheet.getRange(i + 1, RECORD_COLS.MONTH_YEAR + 1).setValue(monthYear);
+          updatedCount++;
+        }
+      }
+    }
+
+    Logger.log(`Migration completed. Updated ${updatedCount} records.`);
+    return { success: true, updatedCount: updatedCount };
+
+  } catch (e) {
+    Logger.log(`Error in migrateCOCRecordsMonthYear: ${e}`);
+    return { success: false, message: e.message };
+  }
+}
+
 /**
  * CORRECTED: Calculates expiration date based on CERTIFICATE ISSUE DATE
  * Formula: Certificate Issue Date + 1 Year - 1 Day
- * 
+ *
  * Example:
  *   Certificate issued: Nov 5, 2025
  *   Expiration: Nov 4, 2026 (NOT Nov 5, 2026)
@@ -2625,16 +2679,13 @@ function apiGenerateCOCCertificate(recordId) {
 }
 
 /**
- * Lists all COC records for a specific employee and month/year along with
- * certificate information. Returns an array of records with display date,
- * day type, hours worked, COC earned, and certificate details.
- *
- * @param {string} employeeId The employee ID
- * @param {number} month Month number (1-12)
- * @param {number} year Year (e.g., 2025)
- * @return {Array} Array of record objects
+ * OLD VERSION - DEPRECATED
+ * This function has been replaced by the newer version at line 6383+.
+ * Kept here for reference but should not be used.
+ * The newer version uses MONTH_YEAR column filtering instead of parsing dates.
  */
-function apiListCOCRecordsForMonth(employeeId, month, year) {
+/*
+function apiListCOCRecordsForMonth_OLD(employeeId, month, year) {
   const db = getDatabase();
   const recSheet = db.getSheetByName('COC_Records');
   if (!recSheet) throw new Error('COC_Records sheet not found');
@@ -2695,7 +2746,7 @@ function apiListCOCRecordsForMonth(employeeId, month, year) {
     if (dateRendered.getMonth() !== targetMonth || dateRendered.getFullYear() !== targetYear) {
       continue;
     }
-    
+
     const dayType = row[5] || '';
     const hoursWorked = parseFloat(row[10]) || 0;
     const cocEarned = parseFloat(row[12]) || 0;
@@ -2749,6 +2800,7 @@ function apiListCOCRecordsForMonth(employeeId, month, year) {
   Logger.log(`Found ${results.length} records for employee ${employeeId} in ${month}/${year}`);
   return results;
 }
+*/
 
 /**
  * Iterates through all COC records and marks entries as expired when their
@@ -3180,16 +3232,44 @@ function onOpen() {
     .addSeparator()
     .addItem('Record COC Earned', 'showMonthlyCOCEntry')
     .addItem('Record CTO Application', 'showCTORecordForm')
-    .addItem('CTO Applications Manager', 'showCTOApplicationsManager') // NEW!
+    .addItem('CTO Applications Manager', 'showCTOApplicationsManager')
     .addSeparator()
     .addItem('Employee Ledger', 'showEmployeeLedger')
     .addItem('Employee Manager', 'showEmployeeManager')
     .addItem('Holiday Manager', 'showHolidayManager')
     .addItem('Import', 'showHistoricalimport')
-    .addSeparator() // <-- Add this
-    .addItem('Settings', 'showSettings') // <-- Add this
+    .addSeparator()
+    .addItem('Settings', 'showSettings')
     .addItem('Reports', 'showReports')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('Admin Tools')
+      .addItem('Run Data Migration (MONTH_YEAR)', 'runCOCRecordsMigration'))
     .addToUi();
+}
+
+/**
+ * Menu function to run the COC records MONTH_YEAR migration
+ */
+function runCOCRecordsMigration() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Run Data Migration',
+    'This will populate the MONTH_YEAR column for all existing COC records that don\'t have it set.\n\nThis is safe to run multiple times.\n\nProceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response === ui.Button.YES) {
+    try {
+      const result = migrateCOCRecordsMonthYear();
+      if (result.success) {
+        ui.alert('Migration Complete', `Successfully updated ${result.updatedCount} records.`, ui.ButtonSet.OK);
+      } else {
+        ui.alert('Migration Failed', result.message || 'An unknown error occurred.', ui.ButtonSet.OK);
+      }
+    } catch (e) {
+      ui.alert('Migration Error', e.message || String(e), ui.ButtonSet.OK);
+    }
+  }
 }
 
 /**
@@ -3480,10 +3560,12 @@ function checkTotalBalanceLimitForEmployee(employeeId, hoursToAdd) {
 }
 
 /**
- * ENHANCED: Record COC entries with validation
- * This is the function called from MonthlyCOCEntry form
+ * OLD VERSION - DEPRECATED
+ * This function has been replaced by the newer version at line 6436+.
+ * The newer version uses the updated schema with MONTH_YEAR column and improved logic.
  */
-function apiRecordCOCWithValidation(employeeId, month, year, entries) {
+/*
+function apiRecordCOCWithValidation_OLD(employeeId, month, year, entries) {
   const db = getDatabase();
   const TIME_ZONE = getScriptTimeZone();
 
@@ -3707,13 +3789,10 @@ function apiRecordCOCWithValidation(employeeId, month, year, entries) {
   };
 }
 
-/**
- * Wrapper function - maintains backward compatibility
- * Routes to the new validation function
- */
-function apiRecordCOC(employeeId, month, year, entries) {
-  return apiRecordCOCWithValidation(employeeId, month, year, entries);
+function apiRecordCOC_OLD_WRAPPER(employeeId, month, year, entries) {
+  return apiRecordCOCWithValidation_OLD(employeeId, month, year, entries);
 }
+*/
 
 /**
  * Get all CTO applications for a specific employee
@@ -6888,6 +6967,115 @@ function apiSaveSignatories(signatories) {
   } catch (e) {
     Logger.log(`Error in apiSaveSignatories: ${e}`);
     throw new Error(`Failed to save signatories: ${e.message}`);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// API: Delete COC Record
+// -----------------------------------------------------------------------------
+
+/**
+ * Deletes (marks as Cancelled) a COC record.
+ * This is used for pending records that haven't been certificated yet.
+ *
+ * @param {string} recordId - The record ID to delete
+ * @param {string} reason - Reason for deletion
+ * @returns {Object} Result object
+ */
+function apiDeleteCOCRecord(recordId, reason) {
+  if (!recordId) throw new Error("Record ID is required.");
+  if (!reason) throw new Error("Reason for deletion is required.");
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const db = SpreadsheetApp.openById(DATABASE_ID);
+    const recordsSheet = db.getSheetByName('COC_Records');
+    const data = recordsSheet.getDataRange().getValues();
+
+    const currentUser = getCurrentUserEmail();
+    const now = new Date();
+
+    // Find the record
+    let rowIndex = -1;
+    let recordData = null;
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][RECORD_COLS.RECORD_ID] === recordId) {
+        rowIndex = i;
+        recordData = data[i];
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      throw new Error("Record not found.");
+    }
+
+    // Check if record is already certificated
+    const certificateId = recordData[RECORD_COLS.CERTIFICATE_ID];
+    if (certificateId) {
+      throw new Error("Cannot delete a record that has already been certificated. Please contact administrator if you need to cancel a certificated record.");
+    }
+
+    // Check current status
+    const currentStatus = recordData[RECORD_COLS.STATUS];
+    if (currentStatus === STATUS_CANCELLED) {
+      throw new Error("This record has already been cancelled.");
+    }
+
+    // Update the record to mark it as Cancelled
+    // We don't actually delete it to maintain audit trail
+    const row = rowIndex + 1; // Convert to 1-based index
+    recordsSheet.getRange(row, RECORD_COLS.STATUS + 1).setValue(STATUS_CANCELLED);
+    recordsSheet.getRange(row, RECORD_COLS.LAST_MODIFIED + 1).setValue(now);
+    recordsSheet.getRange(row, RECORD_COLS.MODIFIED_BY + 1).setValue(currentUser);
+
+    // Add a note/remark in a comments column if available, or we can add it to the APPROVED_BY column as a workaround
+    // Since we don't have a dedicated "Remarks" column in COC_Records, we'll store it in the ledger
+
+    // Create a ledger entry for this cancellation
+    const ledgerSheet = db.getSheetByName('COC_Ledger');
+    if (ledgerSheet) {
+      const employeeId = recordData[RECORD_COLS.EMPLOYEE_ID];
+      const employeeName = recordData[RECORD_COLS.EMPLOYEE_NAME];
+      const cocEarned = parseFloat(recordData[RECORD_COLS.COC_EARNED] || 0);
+      const monthYear = recordData[RECORD_COLS.MONTH_YEAR];
+
+      const ledgerId = generateUniqueId("LDG-");
+      const ledgerRow = new Array(15).fill('');
+      ledgerRow[LEDGER_COLS.LEDGER_ID] = ledgerId;
+      ledgerRow[LEDGER_COLS.EMPLOYEE_ID] = employeeId;
+      ledgerRow[LEDGER_COLS.EMPLOYEE_NAME] = employeeName;
+      ledgerRow[LEDGER_COLS.TRANSACTION_DATE] = now;
+      ledgerRow[LEDGER_COLS.TRANSACTION_TYPE] = 'COC Cancelled';
+      ledgerRow[LEDGER_COLS.REFERENCE_ID] = recordId;
+      ledgerRow[LEDGER_COLS.BALANCE_BEFORE] = 0; // Since it was pending, it never affected balance
+      ledgerRow[LEDGER_COLS.COC_EARNED] = 0;
+      ledgerRow[LEDGER_COLS.CTO_USED] = 0;
+      ledgerRow[LEDGER_COLS.COC_EXPIRED] = 0;
+      ledgerRow[LEDGER_COLS.BALANCE_ADJUSTMENT] = 0;
+      ledgerRow[LEDGER_COLS.BALANCE_AFTER] = 0;
+      ledgerRow[LEDGER_COLS.MONTH_YEAR_EARNED] = monthYear;
+      ledgerRow[LEDGER_COLS.PROCESSED_BY] = currentUser;
+      ledgerRow[14] = `Cancelled pending COC record (${cocEarned.toFixed(2)} hrs). Reason: ${reason}`; // Remarks column
+
+      ledgerSheet.getRange(ledgerSheet.getLastRow() + 1, 1, 1, ledgerRow.length).setValues([ledgerRow]);
+    }
+
+    Logger.log(`COC Record ${recordId} cancelled by ${currentUser}. Reason: ${reason}`);
+
+    return {
+      success: true,
+      message: "Record cancelled successfully."
+    };
+
+  } catch (e) {
+    Logger.log(`Error in apiDeleteCOCRecord: ${e}`);
+    throw new Error(`Failed to delete record: ${e.message}`);
   } finally {
     lock.releaseLock();
   }
