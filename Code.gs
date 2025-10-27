@@ -6617,7 +6617,8 @@ function testFIFOIntegrityCheck() {
  */
 
 // !!! IMPORTANT: REPLACE 'YOUR_TEMPLATE_ID_HERE' WITH YOUR ACTUAL GOOGLE DOC TEMPLATE ID
-const COC_CERTIFICATE_TEMPLATE_ID = 'YOUR_TEMPLATE_ID_HERE'; 
+// *** REMOVED: Hardcoded template ID - now stored in Settings sheet ***
+// const COC_CERTIFICATE_TEMPLATE_ID = 'YOUR_TEMPLATE_ID_HERE'; 
 
 // -----------------------------------------------------------------------------
 // API: List & Record COC Entries
@@ -6941,10 +6942,15 @@ function apiGenerateMonthlyCOCCertificate(employeeId, month, year, issueDateStri
  */
 function generateCertificateDocument(certificateId, empDetails, records, issueDate, expirationDate) {
   try {
-    const templateId = COC_CERTIFICATE_TEMPLATE_ID;
-    if (templateId === '114b0thKcB-TCO6Zc53e5OgNpWNI5WGWbf2aNDmZjlNE') {
-      throw new Error("Invalid Certificate Template ID. Please update COC_CERTIFICATE_TEMPLATE_ID in Code.gs.");
+    // Get template ID from Settings sheet
+    const settings = getSheetDataNoHeader('Settings');
+    const templateRow = settings.find(r => r[0] === 'COC_CERTIFICATE_TEMPLATE_ID');
+    const templateId = templateRow ? templateRow[1] : null;
+
+    if (!templateId || templateId === 'YOUR_TEMPLATE_ID_HERE' || !templateId.trim()) {
+      throw new Error("Certificate Template ID not configured. Please set COC_CERTIFICATE_TEMPLATE_ID in the Settings sheet.");
     }
+
     const templateFile = DriveApp.getFileById(templateId);
     
     // Create a copy
@@ -7154,6 +7160,53 @@ function apiSaveSignatories(signatories) {
     throw new Error(`Failed to save signatories: ${e.message}`);
   } finally {
     lock.releaseLock();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// API: Get Monthly Certificate
+// -----------------------------------------------------------------------------
+
+/**
+ * Gets the monthly certificate information for display.
+ * Returns null if no certificate exists for the month.
+ *
+ * @param {string} employeeId - The employee ID
+ * @param {number} month - Month (1-12)
+ * @param {number} year - Year (e.g., 2025)
+ * @returns {Object|null} Certificate object or null
+ */
+function apiGetMonthlyCertificate(employeeId, month, year) {
+  if (!employeeId || !month || !year) return null;
+
+  try {
+    const monthYear = `${year}-${String(month).padStart(2, '0')}`;
+    const certsData = getSheetDataNoHeader('COC_Certificates');
+
+    // Find certificate for this employee and month
+    const cert = certsData.find(c =>
+      c[CERT_COLS.EMPLOYEE_ID] === employeeId &&
+      c[CERT_COLS.MONTH_YEAR] === monthYear
+    );
+
+    if (!cert) return null;
+
+    return {
+      certificateId: cert[CERT_COLS.CERTIFICATE_ID],
+      totalCOC: parseFloat(cert[CERT_COLS.TOTAL_COC_EARNED] || 0),
+      numRecords: cert[CERT_COLS.NUMBER_OF_RECORDS],
+      issueDate: cert[CERT_COLS.ISSUE_DATE] ?
+        Utilities.formatDate(new Date(cert[CERT_COLS.ISSUE_DATE]), "GMT+8", "MMM dd, yyyy") : null,
+      expirationDate: cert[CERT_COLS.EXPIRATION_DATE] ?
+        Utilities.formatDate(new Date(cert[CERT_COLS.EXPIRATION_DATE]), "GMT+8", "MMM dd, yyyy") : null,
+      certificateUrl: cert[CERT_COLS.CERTIFICATE_URL],
+      pdfUrl: cert[CERT_COLS.PDF_URL],
+      status: cert[CERT_COLS.STATUS]
+    };
+
+  } catch (e) {
+    Logger.log(`Error in apiGetMonthlyCertificate: ${e}`);
+    return null;
   }
 }
 
