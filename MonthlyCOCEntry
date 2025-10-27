@@ -597,6 +597,75 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="editRecordModalBackdrop"></div>
+  <div class="modal" id="editRecordModal">
+    <div class="bg-white rounded-lg shadow-xl max-w-xl w-full mx-4">
+      <div class="bg-blue-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Edit COC Record</h3>
+        <button id="closeEditRecordModalBtn" class="text-white hover:text-gray-200 transition-colors">
+          <i class="bi bi-x-lg text-xl"></i>
+        </button>
+      </div>
+      <div class="modal-body p-6">
+        <div id="editRecordForm" class="space-y-5">
+          <div>
+            <label for="editDayType" class="block text-sm font-medium text-gray-700 mb-1">Day Type</label>
+            <select id="editDayType" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="Weekday">Weekday</option>
+              <option value="Weekend">Weekend</option>
+              <option value="Regular Holiday">Regular Holiday</option>
+              <option value="Special Non-Working">Special Non-Working</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="editAmIn" class="block text-sm font-medium text-gray-700 mb-1">AM In</label>
+              <input type="time" id="editAmIn" class="am-in w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label for="editAmOut" class="block text-sm font-medium text-gray-700 mb-1">AM Out</label>
+              <input type="time" id="editAmOut" class="am-out w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label for="editPmIn" class="block text-sm font-medium text-gray-700 mb-1">PM In</label>
+              <input type="time" id="editPmIn" class="pm-in w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+              <label for="editPmOut" class="block text-sm font-medium text-gray-700 mb-1">PM Out</label>
+              <input type="time" id="editPmOut" class="pm-out w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+          </div>
+          <div>
+            <label for="editReasonInput" class="block text-sm font-medium text-gray-700 mb-1">Reason for Update <span class="text-red-500">*</span></label>
+            <textarea id="editReasonInput" rows="3" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Describe why this record needs to be updated..."></textarea>
+            <p id="editReasonError" class="text-red-600 text-sm mt-1 hidden">Please provide a reason for this update.</p>
+          </div>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="text-sm font-semibold text-gray-700 mb-3">Recalculated Totals</div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div class="text-gray-500">Hours Worked</div>
+                <div id="editHoursPreview" class="text-lg font-semibold text-gray-900">-</div>
+              </div>
+              <div>
+                <div class="text-gray-500">Multiplier</div>
+                <div id="editMultiplierPreview" class="text-lg font-semibold text-gray-900">-</div>
+              </div>
+              <div>
+                <div class="text-gray-500">COC Earned</div>
+                <div id="editCocPreview" class="text-lg font-semibold text-gray-900">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex justify-end gap-3">
+        <button id="editRecordCancelBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">Cancel</button>
+        <button id="editRecordSaveBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PDF Generation Spinner -->
   <div id="spinnerBackdrop" class="spinner-backdrop"></div>
   <div id="spinnerModal" class="spinner-modal">
@@ -625,6 +694,9 @@
     let entryCounter = 0;
     let currentEmployeeStats = null;
     let currentRecordToDelete = null;
+    let existingRecords = [];
+    let currentRecordToEdit = null;
+    const VALID_DAY_TYPES = ['Weekday', 'Weekend', 'Regular Holiday', 'Special Non-Working'];
 
     // --- Modal functions (showModal, closeModal, showConfirmModal, closeConfirmModal, etc.) remain unchanged ---
     function showModal(title, body, type) {
@@ -732,6 +804,128 @@
         .apiDeleteCOCRecord(recordId, reason);
     }
 
+    function showEditRecordModal(record) {
+      if (!record) return;
+
+      currentRecordToEdit = record;
+      $('#editDayType').val(record.dayType && VALID_DAY_TYPES.includes(record.dayType) ? record.dayType : 'Weekday');
+      $('#editAmIn').val(record.amIn || '');
+      $('#editAmOut').val(record.amOut || '');
+      $('#editPmIn').val(record.pmIn || '');
+      $('#editPmOut').val(record.pmOut || '');
+      $('#editReasonInput').val('');
+      $('#editReasonError').addClass('hidden');
+
+      $('#editRecordForm').find('input[type="time"]').removeClass('time-input-error');
+      $('#editHoursPreview').text(record.hoursWorked !== undefined ? Number(record.hoursWorked || 0).toFixed(2) : '-');
+      $('#editMultiplierPreview').text(record.multiplier !== undefined ? Number(record.multiplier || 0).toFixed(2) : '-');
+      $('#editCocPreview').text(record.cocEarned !== undefined ? Number(record.cocEarned || 0).toFixed(2) : '-');
+
+      $('#editRecordModalBackdrop, #editRecordModal').addClass('show');
+      refreshEditPreview();
+    }
+
+    function closeEditRecordModal() {
+      $('#editRecordModalBackdrop, #editRecordModal').removeClass('show');
+      currentRecordToEdit = null;
+      $('#editRecordForm').find('input[type="time"]').removeClass('time-input-error');
+      $('#editReasonError').addClass('hidden');
+      $('#editHoursPreview').text('-');
+      $('#editMultiplierPreview').text('-');
+      $('#editCocPreview').text('-');
+    }
+
+    function refreshEditPreview() {
+      if (!currentRecordToEdit) return;
+
+      const dayType = $('#editDayType').val();
+      const amIn = $('#editAmIn').val();
+      const amOut = $('#editAmOut').val();
+      const pmIn = $('#editPmIn').val();
+      const pmOut = $('#editPmOut').val();
+
+      const year = currentRecordToEdit.year || parseInt($('#yearSelect').val(), 10);
+      const month = currentRecordToEdit.month || parseInt($('#monthSelect').val(), 10);
+      const day = currentRecordToEdit.day;
+
+      if (!year || !month || !day) {
+        $('#editHoursPreview').text('-');
+        $('#editMultiplierPreview').text('-');
+        $('#editCocPreview').text('-');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          $('#editHoursPreview').text(result && result.hoursWorked !== undefined ? result.hoursWorked.toFixed(2) : '0.00');
+          $('#editMultiplierPreview').text(result && result.multiplier !== undefined ? result.multiplier.toFixed(2) : '1.00');
+          $('#editCocPreview').text(result && result.cocEarned !== undefined ? result.cocEarned.toFixed(2) : '0.00');
+        })
+        .withFailureHandler(function() {
+          $('#editHoursPreview').text('-');
+          $('#editMultiplierPreview').text('-');
+          $('#editCocPreview').text('-');
+        })
+        .apiCalculateOvertimeForDate(year, month, day, amIn || '', amOut || '', pmIn || '', pmOut || '', dayType);
+    }
+
+    function submitEditRecord() {
+      if (!currentRecordToEdit) {
+        showModal('Error', 'No record selected for editing.', 'danger');
+        return;
+      }
+
+      const container = $('#editRecordForm');
+      const payload = {
+        dayType: $('#editDayType').val(),
+        amIn: $('#editAmIn').val() || '',
+        amOut: $('#editAmOut').val() || '',
+        pmIn: $('#editPmIn').val() || '',
+        pmOut: $('#editPmOut').val() || '',
+        reason: $('#editReasonInput').val().trim()
+      };
+
+      if (!payload.reason) {
+        $('#editReasonError').removeClass('hidden');
+        return;
+      }
+      $('#editReasonError').addClass('hidden');
+
+      const entryForValidation = {
+        amIn: payload.amIn,
+        amOut: payload.amOut,
+        pmIn: payload.pmIn,
+        pmOut: payload.pmOut
+      };
+
+      const validation = validateTimeInputs(entryForValidation, container);
+      if (!validation.valid) {
+        showModal('Validation Error', `Edit Entry: ${validation.message}`, 'danger');
+        return;
+      }
+
+      const saveBtn = $('#editRecordSaveBtn');
+      saveBtn.prop('disabled', true).html('<i class="bi bi-arrow-repeat animate-spin"></i> Saving...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          saveBtn.prop('disabled', false).html('Save Changes');
+          closeEditRecordModal();
+          if (result && result.record) {
+            showModal('Success', 'The COC record was updated successfully.', 'success');
+          } else {
+            showModal('Success', 'The COC record was updated.', 'success');
+          }
+          loadExistingRecords();
+          updateEmployeeInfo();
+        })
+        .withFailureHandler(function(error) {
+          saveBtn.prop('disabled', false).html('Save Changes');
+          showModal('Error', error && error.message ? error.message : 'Failed to update record.', 'danger');
+        })
+        .apiUpdateCOCRecord(currentRecordToEdit.recordId, payload);
+    }
+
     // --- Helper functions (getDaysInMonth, validateDayNumber, checkDuplicateDay, showDuplicateModal, updateEntryCounter, loadEmployees, loadEmployeeCOCStats, updateEmployeeInfo, validateCOCLimits, loadMonthOptions, loadYearOptions, updateSelectedMonthYearDisplay) remain unchanged ---
     function getDaysInMonth(month, year) {
       return new Date(year, month, 0).getDate();
@@ -756,7 +950,7 @@
           message: `<strong>${monthNames[month - 1]} ${day}, ${year}</strong> already has a COC record in the database.<br><br>` +
                    `<div class="bg-blue-50 border-l-4 border-blue-400 p-3 mt-2">` +
                    `<i class="bi bi-info-circle text-blue-600"></i> ` +
-                   `<strong>To update this record:</strong> Please delete this entry first. Future updates will allow editing.</div>`,
+                   `<strong>To update this record:</strong> Use the <em>Edit</em> option in the "Recorded Entries" table.</div>`,
           isDatabaseDuplicate: true
         };
       }
@@ -1438,6 +1632,7 @@
       if (!employeeId || !month || !year) {
         $('#existingRecordsEmpty').removeClass('hidden').text('Select an employee and month to view recorded entries.');
         existingRecordDates = [];
+        existingRecords = [];
         return;
       }
 
@@ -1448,6 +1643,7 @@
         .withSuccessHandler(function(records) {
           body.empty();
           existingRecordDates = [];
+          existingRecords = Array.isArray(records) ? records : [];
 
           if (!records || records.length === 0) {
             $('#existingRecordsEmpty').removeClass('hidden').text('No entries recorded for this month yet.');
@@ -1456,7 +1652,7 @@
             return;
           }
 
-          const hasUncertificatedRecords = records.some(r => !r.certificateUrl);
+          const hasUncertificatedRecords = records.some(r => !r.certificateId);
           if (hasUncertificatedRecords) {
               $('#generateMonthlyCertBtn').removeClass('hidden').prop('disabled', false); // Show enabled button
           } else {
@@ -1464,11 +1660,19 @@
           }
 
           records.forEach(record => {
-            existingRecordDates.push(new Date(record.displayDate).getDate());
+            if (typeof record.day === 'number' && !isNaN(record.day)) {
+              existingRecordDates.push(record.day);
+            } else if (record.rawDate) {
+              const parts = record.rawDate.split('-').map(Number);
+              if (parts.length === 3 && parts.every(num => !isNaN(num))) {
+                existingRecordDates.push(parts[2]);
+              }
+            }
 
-            const actionsCell = !record.certificateUrl
+            const canEdit = !record.certificateId;
+            const actionsCell = canEdit
               ? `<div class="flex gap-2 justify-center">
-                   <button class="edit-record-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50" data-record-id="${record.recordId}" title="Edit Record" disabled>
+                   <button class="edit-record-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" data-record-id="${record.recordId}" title="Edit Record">
                      <i class="bi bi-pencil-square"></i> Edit
                    </button>
                    <button class="delete-record-btn px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600" data-record-id="${record.recordId}" title="Delete Record">
@@ -1491,7 +1695,13 @@
             });
 
             row.find('.edit-record-btn').on('click', function() {
-              showModal('Info', 'Edit functionality is not yet available. Please delete and re-create the record if needed.', 'info');
+              const recordId = $(this).data('recordId');
+              const target = existingRecords.find(r => r.recordId === recordId);
+              if (target) {
+                showEditRecordModal(target);
+              } else {
+                showModal('Error', 'Unable to load record details. Please refresh the list.', 'danger');
+              }
             });
 
             body.append(row);
@@ -1501,6 +1711,8 @@
         })
         .withFailureHandler(function(error) {
           body.empty();
+          existingRecords = [];
+          existingRecordDates = [];
           $('#existingRecordsEmpty').removeClass('hidden').text('Failed to load records.');
           showStatus(error && error.message ? error.message : String(error), 'error');
           $('#generateMonthlyCertBtn').addClass('hidden').prop('disabled', true);
@@ -1794,6 +2006,15 @@
       $('#closeDeleteRecordModalBtn, #deleteRecordCancelBtn').on('click', closeDeleteRecordModal);
       $('#deleteRecordConfirmBtn').on('click', confirmDeleteRecord);
       $('#deleteRecordModalBackdrop').on('click', closeDeleteRecordModal);
+
+      $('#closeEditRecordModalBtn, #editRecordCancelBtn').on('click', closeEditRecordModal);
+      $('#editRecordSaveBtn').on('click', submitEditRecord);
+      $('#editDayType, #editAmIn, #editAmOut, #editPmIn, #editPmOut').on('change', refreshEditPreview);
+      $('#editReasonInput').on('input', function() {
+        if ($(this).val().trim()) {
+          $('#editReasonError').addClass('hidden');
+        }
+      });
 
     };
 
