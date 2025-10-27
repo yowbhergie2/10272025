@@ -115,6 +115,9 @@ const TR_TYPE_USED = 'Used';
 const TR_TYPE_EXPIRED = 'Expired';
 const TR_TYPE_ADJUSTED = 'Adjusted';
 
+const AUDIT_TRAIL_SHEET_NAME = 'COC_Audit_Trail';
+const VALID_DAY_TYPES = ['Weekday', 'Weekend', 'Regular Holiday', 'Special Non-Working'];
+
 // -----------------------------------------------------------------------------
 // Migration Functions
 // -----------------------------------------------------------------------------
@@ -631,6 +634,97 @@ function generateUniqueId(prefix) {
   return `${prefix}${timestamp}${random}`;
 }
 
+function createDateAtNoon(year, month, day) {
+  const y = parseInt(year, 10);
+  const m = parseInt(month, 10);
+  const d = parseInt(day, 10);
+
+  if (isNaN(y) || isNaN(m) || isNaN(d)) {
+    throw new Error('Invalid date components provided.');
+  }
+
+  const date = new Date(y, m - 1, d);
+  date.setHours(12, 0, 0, 0);
+  return date;
+}
+
+function normalizeDayType(dayType) {
+  if (!dayType && dayType !== 0) return null;
+  const value = String(dayType).trim();
+  if (!value) return null;
+  const match = VALID_DAY_TYPES.find(type => type.toLowerCase() === value.toLowerCase());
+  return match || null;
+}
+
+function getMultiplierForDayType(dayType) {
+  switch (dayType) {
+    case 'Weekend':
+    case 'Regular Holiday':
+    case 'Special Non-Working':
+      return 1.5;
+    default:
+      return 1.0;
+  }
+}
+
+function ensureAuditTrailSheet() {
+  const db = SpreadsheetApp.openById(DATABASE_ID);
+  let sheet = db.getSheetByName(AUDIT_TRAIL_SHEET_NAME);
+
+  if (!sheet) {
+    sheet = db.insertSheet(AUDIT_TRAIL_SHEET_NAME);
+  }
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      'Timestamp',
+      'Record ID',
+      'Employee ID',
+      'Employee Name',
+      'Date Rendered',
+      'Changes',
+      'Reason',
+      'Updated By'
+    ]);
+  }
+
+  return sheet;
+}
+
+function logCOCRecordEdit(details) {
+  const sheet = ensureAuditTrailSheet();
+  const TIME_ZONE = getScriptTimeZone();
+  const timestamp = new Date();
+  const renderedDateString = details.dateRendered instanceof Date && !isNaN(details.dateRendered.getTime())
+    ? Utilities.formatDate(new Date(details.dateRendered), TIME_ZONE, 'MMM dd, yyyy')
+    : '';
+
+  const changeLines = [
+    `Day Type: ${details.previous.dayType || '-'} → ${details.updated.dayType || '-'}`,
+    `AM In: ${details.previous.amIn || '-'} → ${details.updated.amIn || '-'}`,
+    `AM Out: ${details.previous.amOut || '-'} → ${details.updated.amOut || '-'}`,
+    `PM In: ${details.previous.pmIn || '-'} → ${details.updated.pmIn || '-'}`,
+    `PM Out: ${details.previous.pmOut || '-'} → ${details.updated.pmOut || '-'}`,
+    `Hours Worked: ${(details.previous.hoursWorked ?? '-')} → ${(details.updated.hoursWorked ?? '-')}`,
+    `COC Earned: ${(details.previous.cocEarned ?? '-')} → ${(details.updated.cocEarned ?? '-')}`
+  ].join('\n');
+
+  sheet.appendRow([
+    timestamp,
+    details.recordId,
+    details.employeeId,
+    details.employeeName,
+    renderedDateString,
+    changeLines,
+    details.reason,
+    details.user
+  ]);
+}
+
+function updateRow(sheet, rowIndex, values) {
+  sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
+}
+
 // ============================================================================
 // --- NEW HELPER FUNCTION ---
 // This function contains the logic to determine the day type.
@@ -1078,9 +1172,9 @@ function apiGetDayType(year, month, day) {
  * @param {string} pmOut - PM out time (HH:mm format)
  * @return {Object} Result with dayType, hoursWorked, multiplier, cocEarned
  */
-function apiCalculateOvertimeForDate(year, month, day, amIn, amOut, pmIn, pmOut) {
-  const date = new Date(year, month - 1, day);
-  return calculateOvertimeForDate(date, amIn, amOut, pmIn, pmOut);
+function apiCalculateOvertimeForDate(year, month, day, amIn, amOut, pmIn, pmOut, overrideDayType) {
+  const date = createDateAtNoon(year, month, day);
+  return calculateOvertimeForDate(date, amIn, amOut, pmIn, pmOut, overrideDayType);
 }
 
 /**
@@ -1883,96 +1977,57 @@ function calculateBalanceFallback(employeeId) {
  * Calculates overtime hours, the appropriate multiplier, and the resulting COC
  * earned for a single date. The day type is automatically determined by
  * checking the day of week and any matching entry in the Holidays sheet.
- * Weekdays allow overtime only between 5:00 PM and 7:00 PM (maximum 2 hours).
- * Weekends and holidays allow morning (8:00–12:00) and afternoon (1:00–5:00)
- * blocks, excluding the lunch break from 12:01–12:59 PM. For weekends and
- * holidays the multiplier is 1.5. All calculations are capped as per the
- * business rules.
+ * Hours are computed by summing the AM and PM time blocks supplied by the
+ * caller (in minutes) and converting the total to hours. Values are rounded to
+ * two decimal places before applying the appropriate day-type multiplier.
  *
  * @param {Date} date The calendar date being processed.
  * @param {string} amIn  Optional AM start time in HH:MM (24‑hour) format.
  * @param {string} amOut Optional AM end time in HH:MM (24‑hour) format.
  * @param {string} pmIn  Optional PM start time in HH:MM (24‑hour) format.
  * @param {string} pmOut Optional PM end time in HH:MM (24‑hour) format.
+ * @param {string=} overrideDayType Optional day type override when editing.
  * @return {Object} An object describing the day type, hours worked, multiplier
  * and COC earned.
-*/
-function calculateOvertimeForDate(date, amIn, amOut, pmIn, pmOut) {
-  const settings = getSettings();
-  const TIME_ZONE = getScriptTimeZone(); // Added this
+ */
+function calculateOvertimeForDate(date, amIn, amOut, pmIn, pmOut, overrideDayType) {
+  const normalizedOverride = normalizeDayType(overrideDayType);
+  const dayType = normalizedOverride || getDayType(date);
+  const multiplier = getMultiplierForDayType(dayType);
 
-  // --- MODIFICATION ---
-  // Call the new helper function to get the day type
-  const dayType = getDayType(date);
-  // --- END MODIFICATION ---
-
-  let hoursWorked = 0;
-  let multiplier = 1.0;
-  // Helper to convert time string to a Date on same day
   function parseTime(timeStr) {
     if (!timeStr) return null;
     const parts = timeStr.split(':');
+    if (parts.length < 2) return null;
     const h = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return null;
     const d = new Date(date);
     d.setHours(h, m, 0, 0);
     return d;
   }
-  const amStart = parseTime(amIn);
-  const amEnd = parseTime(amOut);
-  const pmStart = parseTime(pmIn);
-  const pmEnd = parseTime(pmOut);
-  if (dayType === 'Weekday') {
-    // Weekday overtime from 5:00 PM to 7:00 PM
-    const otStart = new Date(date);
-    otStart.setHours(17, 0, 0, 0);
-    const otEnd = new Date(date);
-    otEnd.setHours(19, 0, 0, 0);
-    const outTime = pmEnd;
-    if (outTime && outTime > otStart) {
-      let endTime = outTime > otEnd ? otEnd : outTime;
-      const ms = endTime.getTime() - otStart.getTime();
-      const hours = ms / (1000 * 60 * 60);
-      hoursWorked = Math.min(Math.max(hours, 0), 2);
-    }
-    multiplier = 1.0;
-  } else {
-    // Weekend/Holiday schedule
-    const morningStart = new Date(date);
-    morningStart.setHours(8, 0, 0, 0);
-    const morningEnd = new Date(date);
-    morningEnd.setHours(12, 0, 0, 0);
-    const afternoonStart = new Date(date);
-    afternoonStart.setHours(13, 0, 0, 0);
-    const afternoonEnd = new Date(date);
-    afternoonEnd.setHours(17, 0, 0, 0);
-    // Morning block
-    if (amStart && amEnd) {
-      let startTime = amStart < morningStart ? morningStart : amStart;
-      let endTime = amEnd > morningEnd ? morningEnd : amEnd;
-      const ms = endTime.getTime() - startTime.getTime();
-      if (ms > 0) {
-        hoursWorked += ms / (1000 * 60 * 60);
-      }
-    }
-    // Afternoon block
-    if (pmStart && pmEnd) {
-      let startTime = pmStart < afternoonStart ? afternoonStart : pmStart;
-      let endTime = pmEnd > afternoonEnd ? afternoonEnd : pmEnd;
-      const ms = endTime.getTime() - startTime.getTime();
-      if (ms > 0) {
-        hoursWorked += ms / (1000 * 60 * 60);
-      }
-    }
-    multiplier = 1.5;
+
+  function minutesBetween(startStr, endStr) {
+    if (!startStr || !endStr) return 0;
+    const start = parseTime(startStr);
+    const end = parseTime(endStr);
+    if (!start || !end) return 0;
+    const diff = end.getTime() - start.getTime();
+    return diff > 0 ? Math.round(diff / 60000) : 0;
   }
-  const cocEarned = hoursWorked * multiplier;
+
+  const amMinutes = minutesBetween(amIn, amOut);
+  const pmMinutes = minutesBetween(pmIn, pmOut);
+  const totalMinutes = amMinutes + pmMinutes;
+  const hoursRaw = totalMinutes / 60;
+  const hoursWorked = Math.round(hoursRaw * 100) / 100;
+  const cocEarned = Math.round(hoursWorked * multiplier * 100) / 100;
+
   return {
     dayType: dayType,
     hoursWorked: hoursWorked,
     multiplier: multiplier,
     cocEarned: cocEarned,
-    // Added these to pass them to the next step
     amIn: amIn || '',
     amOut: amOut || '',
     pmIn: pmIn || '',
@@ -2055,7 +2110,7 @@ function recordCOCEntries(employeeId, month, year, entries) {
   // Check for duplicates and collect them
   const duplicates = [];
   entries.forEach(entry => {
-    const date = new Date(year, month - 1, entry.day);
+    const date = createDateAtNoon(year, month, entry.day);
     const key = Utilities.formatDate(date, TIME_ZONE, 'yyyy-MM-dd');
     if (existingDates[key]) {
       duplicates.push({
@@ -2094,7 +2149,7 @@ function recordCOCEntries(employeeId, month, year, entries) {
   }
   // Now build rows
   entries.forEach(entry => {
-    const date = new Date(year, month - 1, entry.day);
+    const date = createDateAtNoon(year, month, entry.day);
     const result = calculateOvertimeForDate(date, entry.amIn, entry.amOut, entry.pmIn, entry.pmOut);
     if(result.cocEarned <= 0) return; // Don't log entries with 0 hours
 
@@ -6635,6 +6690,7 @@ function apiListCOCRecordsForMonth(employeeId, month, year) {
     const monthYear = `${year}-${String(month).padStart(2, '0')}`;
     const recordsData = getSheetDataNoHeader('COC_Records');
     const certsData = getSheetDataNoHeader('COC_Certificates');
+    const TIME_ZONE = getScriptTimeZone();
 
     Logger.log(`apiListCOCRecordsForMonth: Searching for empId="${employeeId}", month=${month}, year=${year}, monthYear="${monthYear}"`);
     Logger.log(`Total records in sheet: ${recordsData.length}`);
@@ -6673,12 +6729,41 @@ function apiListCOCRecordsForMonth(employeeId, month, year) {
       const certificateId = r[RECORD_COLS.CERTIFICATE_ID];
       const certInfo = certMap.get(certificateId);
 
+      const dateValue = r[RECORD_COLS.DATE_RENDERED];
+      const dateObj = dateValue instanceof Date ? new Date(dateValue) : new Date(dateValue);
+      let displayDate = '';
+      let isoDate = '';
+      let dayNumber = null;
+      let monthNumber = null;
+      let yearNumber = null;
+
+      if (!isNaN(dateObj.getTime())) {
+        displayDate = Utilities.formatDate(dateObj, TIME_ZONE, 'MMM dd, yyyy');
+        isoDate = Utilities.formatDate(dateObj, TIME_ZONE, 'yyyy-MM-dd');
+        const parts = isoDate.split('-').map(Number);
+        if (parts.length === 3) {
+          yearNumber = parts[0];
+          monthNumber = parts[1];
+          dayNumber = parts[2];
+        }
+      }
+
       return {
         recordId: recordId,
-        displayDate: Utilities.formatDate(new Date(r[RECORD_COLS.DATE_RENDERED]), "GMT+8", "MMM dd, yyyy"),
+        displayDate: displayDate,
+        rawDate: isoDate,
+        day: dayNumber,
+        month: monthNumber,
+        year: yearNumber,
         dayType: r[RECORD_COLS.DAY_TYPE],
+        amIn: r[RECORD_COLS.AM_IN] || '',
+        amOut: r[RECORD_COLS.AM_OUT] || '',
+        pmIn: r[RECORD_COLS.PM_IN] || '',
+        pmOut: r[RECORD_COLS.PM_OUT] || '',
         hoursWorked: parseFloat(r[RECORD_COLS.HOURS_WORKED] || 0),
+        multiplier: parseFloat(r[RECORD_COLS.MULTIPLIER] || 0),
         cocEarned: parseFloat(r[RECORD_COLS.COC_EARNED] || 0),
+        status: r[RECORD_COLS.STATUS] || '',
         certificateId: certificateId,
         certificateUrl: certInfo ? certInfo.url : null,
         pdfUrl: certInfo ? (certInfo.pdf || certInfo.url) : null // Fallback pdf to url
@@ -6725,7 +6810,7 @@ function apiRecordCOC(employeeId, month, year, entries) {
       
       if (result.cocEarned > 0) {
         const recordId = generateUniqueId("COC-");
-        const dateRendered = new Date(year, month - 1, entry.day);
+        const dateRendered = createDateAtNoon(year, month, entry.day);
 
         const newRow = new Array(22).fill(''); // Initialize empty row
         newRow[RECORD_COLS.RECORD_ID] = recordId;
@@ -6772,6 +6857,133 @@ function apiRecordCOC(employeeId, month, year, entries) {
   } catch (e) {
     Logger.log(`Error in apiRecordCOC: ${e}`);
     throw new Error(`Failed to record COC entries: ${e.message}`);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function apiUpdateCOCRecord(recordId, updates) {
+  if (!recordId) throw new Error('Record ID is required.');
+  if (!updates) throw new Error('Update payload is required.');
+
+  const reason = updates.reason ? String(updates.reason).trim() : '';
+  if (!reason) throw new Error('Reason for update is required.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const db = SpreadsheetApp.openById(DATABASE_ID);
+    const recordsSheet = db.getSheetByName('COC_Records');
+    if (!recordsSheet) throw new Error('COC_Records sheet not found.');
+
+    const data = recordsSheet.getDataRange().getValues();
+    let targetRowIndex = -1;
+    let rowValues = null;
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][RECORD_COLS.RECORD_ID] === recordId) {
+        targetRowIndex = i + 1;
+        rowValues = data[i];
+        break;
+      }
+    }
+
+    if (targetRowIndex === -1 || !rowValues) {
+      throw new Error('Record not found.');
+    }
+
+    const certificateId = rowValues[RECORD_COLS.CERTIFICATE_ID];
+    if (certificateId) {
+      throw new Error('Cannot edit a record that has already been certificated.');
+    }
+
+    const status = String(rowValues[RECORD_COLS.STATUS] || '').trim();
+    if (status === STATUS_CANCELLED) {
+      throw new Error('Cannot edit a cancelled record.');
+    }
+
+    const dateValue = rowValues[RECORD_COLS.DATE_RENDERED];
+    const dateRendered = dateValue instanceof Date ? new Date(dateValue) : new Date(dateValue);
+    if (isNaN(dateRendered.getTime())) {
+      throw new Error('Record has an invalid rendered date.');
+    }
+
+    const requestedDayType = normalizeDayType(updates.dayType);
+    const existingDayType = normalizeDayType(rowValues[RECORD_COLS.DAY_TYPE]);
+    const effectiveDayType = requestedDayType || existingDayType || getDayType(dateRendered);
+
+    const amIn = updates.amIn ? String(updates.amIn).trim() : '';
+    const amOut = updates.amOut ? String(updates.amOut).trim() : '';
+    const pmIn = updates.pmIn ? String(updates.pmIn).trim() : '';
+    const pmOut = updates.pmOut ? String(updates.pmOut).trim() : '';
+
+    const calculation = calculateOvertimeForDate(dateRendered, amIn, amOut, pmIn, pmOut, effectiveDayType);
+
+    const updatedRow = rowValues.slice();
+    const now = new Date();
+    const currentUser = getCurrentUserEmail();
+
+    const previousSnapshot = {
+      dayType: rowValues[RECORD_COLS.DAY_TYPE],
+      amIn: rowValues[RECORD_COLS.AM_IN],
+      amOut: rowValues[RECORD_COLS.AM_OUT],
+      pmIn: rowValues[RECORD_COLS.PM_IN],
+      pmOut: rowValues[RECORD_COLS.PM_OUT],
+      hoursWorked: rowValues[RECORD_COLS.HOURS_WORKED],
+      cocEarned: rowValues[RECORD_COLS.COC_EARNED]
+    };
+
+    updatedRow[RECORD_COLS.DAY_TYPE] = calculation.dayType;
+    updatedRow[RECORD_COLS.AM_IN] = amIn;
+    updatedRow[RECORD_COLS.AM_OUT] = amOut;
+    updatedRow[RECORD_COLS.PM_IN] = pmIn;
+    updatedRow[RECORD_COLS.PM_OUT] = pmOut;
+    updatedRow[RECORD_COLS.HOURS_WORKED] = calculation.hoursWorked;
+    updatedRow[RECORD_COLS.MULTIPLIER] = calculation.multiplier;
+    updatedRow[RECORD_COLS.COC_EARNED] = calculation.cocEarned;
+    updatedRow[RECORD_COLS.LAST_MODIFIED] = now;
+    updatedRow[RECORD_COLS.MODIFIED_BY] = currentUser;
+
+    updateRow(recordsSheet, targetRowIndex, updatedRow);
+
+    logCOCRecordEdit({
+      recordId: recordId,
+      employeeId: updatedRow[RECORD_COLS.EMPLOYEE_ID],
+      employeeName: updatedRow[RECORD_COLS.EMPLOYEE_NAME],
+      dateRendered: dateRendered,
+      previous: previousSnapshot,
+      updated: {
+        dayType: calculation.dayType,
+        amIn: amIn,
+        amOut: amOut,
+        pmIn: pmIn,
+        pmOut: pmOut,
+        hoursWorked: calculation.hoursWorked,
+        cocEarned: calculation.cocEarned
+      },
+      reason: reason,
+      user: currentUser
+    });
+
+    return {
+      success: true,
+      record: {
+        recordId: recordId,
+        dayType: calculation.dayType,
+        amIn: amIn,
+        amOut: amOut,
+        pmIn: pmIn,
+        pmOut: pmOut,
+        hoursWorked: calculation.hoursWorked,
+        cocEarned: calculation.cocEarned,
+        multiplier: calculation.multiplier
+      }
+    };
+
+  } catch (e) {
+    Logger.log(`Error in apiUpdateCOCRecord: ${e}`);
+    throw new Error(`Failed to update record: ${e.message}`);
   } finally {
     lock.releaseLock();
   }
