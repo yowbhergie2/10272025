@@ -6966,7 +6966,6 @@ function generateCertificateDocument(certificateId, empDetails, records, issueDa
     const expiryDateFormatted = formatLongDate(expirationDate);
 
     // *** MODIFIED: Get signatories dynamically from "Signatories" sheet ***
-    const settings = getSheetDataNoHeader('Signatories'); // Changed from 'Settings'
     const getSetting = (key) => {
       const row = settings.find(r => r[0] === key);
       return row ? row[1] : `[${key} not found]`;
@@ -7318,7 +7317,6 @@ function apiDeleteCOCRecord(recordId, reason) {
     lock.releaseLock();
   }
 }
-
 
 
 
