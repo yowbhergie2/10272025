@@ -124,6 +124,8 @@ const TR_TYPE_ADJUSTED = 'Adjusted';
  * This is needed because older records were created without the MONTH_YEAR column,
  * and the new apiListCOCRecordsForMonth function filters by this column.
  *
+ * IMPORTANT: Sets the column format to PLAIN TEXT to prevent auto-conversion to dates!
+ *
  * Run this function once to migrate old data.
  */
 function migrateCOCRecordsMonthYear() {
@@ -134,6 +136,17 @@ function migrateCOCRecordsMonthYear() {
     if (!recordsSheet) {
       Logger.log('COC_Records sheet not found');
       return { success: false, message: 'COC_Records sheet not found' };
+    }
+
+    // CRITICAL FIX: Set the MONTH_YEAR column (Column D) to PLAIN TEXT format
+    // This prevents Google Sheets from auto-converting "2025-10" to a Date object
+    const monthYearColumnIndex = RECORD_COLS.MONTH_YEAR + 1; // Convert to 1-based
+    const lastRow = recordsSheet.getLastRow();
+
+    if (lastRow > 1) {
+      const monthYearRange = recordsSheet.getRange(2, monthYearColumnIndex, lastRow - 1, 1);
+      monthYearRange.setNumberFormat('@STRING@'); // Force plain text format
+      Logger.log(`Set column ${monthYearColumnIndex} (MONTH_YEAR) to PLAIN TEXT format for rows 2-${lastRow}`);
     }
 
     const data = recordsSheet.getDataRange().getValues();
@@ -207,7 +220,8 @@ function migrateCOCRecordsMonthYear() {
 
       // Update the cell if needed
       if (needsUpdate && newMonthYear) {
-        recordsSheet.getRange(i + 1, RECORD_COLS.MONTH_YEAR + 1).setValue(newMonthYear);
+        // Set as plain text with single quote prefix to FORCE text format
+        recordsSheet.getRange(i + 1, monthYearColumnIndex).setValue("'" + newMonthYear);
         updatedCount++;
       }
     }
