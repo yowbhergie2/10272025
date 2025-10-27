@@ -138,6 +138,7 @@ function migrateCOCRecordsMonthYear() {
 
     const data = recordsSheet.getDataRange().getValues();
     let updatedCount = 0;
+    let fixedCount = 0;
 
     Logger.log(`Starting migration. Total rows: ${data.length}`);
 
@@ -147,25 +148,76 @@ function migrateCOCRecordsMonthYear() {
       const monthYearValue = row[RECORD_COLS.MONTH_YEAR];
       const dateRendered = row[RECORD_COLS.DATE_RENDERED];
 
-      // If MONTH_YEAR is empty and we have a DATE_RENDERED, populate it
+      let needsUpdate = false;
+      let newMonthYear = null;
+
+      // Case 1: MONTH_YEAR is empty
       if (!monthYearValue && dateRendered) {
         const date = new Date(dateRendered);
         if (!isNaN(date.getTime())) {
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, '0');
-          const monthYear = `${year}-${month}`;
-
-          // Update the MONTH_YEAR column (column D, which is column 4, index 3+1)
-          recordsSheet.getRange(i + 1, RECORD_COLS.MONTH_YEAR + 1).setValue(monthYear);
-          updatedCount++;
-
-          Logger.log(`Row ${i + 1}: Set MONTH_YEAR to ${monthYear} for date ${date}`);
+          newMonthYear = `${year}-${month}`;
+          needsUpdate = true;
+          Logger.log(`Row ${i + 1}: EMPTY - Set to ${newMonthYear} from date ${date}`);
         }
+      }
+      // Case 2: MONTH_YEAR is a Date object (should be a string)
+      else if (monthYearValue instanceof Date) {
+        const date = new Date(monthYearValue);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          newMonthYear = `${year}-${month}`;
+          needsUpdate = true;
+          fixedCount++;
+          Logger.log(`Row ${i + 1}: DATE OBJECT - Convert to ${newMonthYear}`);
+        }
+      }
+      // Case 3: MONTH_YEAR is in wrong format (MM-YYYY instead of YYYY-MM)
+      else if (typeof monthYearValue === 'string') {
+        const trimmed = monthYearValue.trim();
+        // Check if it matches MM-YYYY format (e.g., "10-2025")
+        const mmYyyyMatch = trimmed.match(/^(\d{2})-(\d{4})$/);
+        if (mmYyyyMatch) {
+          const month = mmYyyyMatch[1];
+          const year = mmYyyyMatch[2];
+          newMonthYear = `${year}-${month}`;
+          needsUpdate = true;
+          fixedCount++;
+          Logger.log(`Row ${i + 1}: WRONG FORMAT "${trimmed}" - Fix to ${newMonthYear}`);
+        }
+        // If it's already in YYYY-MM format, skip
+        else if (trimmed.match(/^\d{4}-\d{2}$/)) {
+          Logger.log(`Row ${i + 1}: Already correct format: ${trimmed}`);
+        }
+        // Unknown format - try to fix from date
+        else if (dateRendered) {
+          const date = new Date(dateRendered);
+          if (!isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            newMonthYear = `${year}-${month}`;
+            needsUpdate = true;
+            fixedCount++;
+            Logger.log(`Row ${i + 1}: UNKNOWN FORMAT "${trimmed}" - Fix to ${newMonthYear} from date`);
+          }
+        }
+      }
+
+      // Update the cell if needed
+      if (needsUpdate && newMonthYear) {
+        recordsSheet.getRange(i + 1, RECORD_COLS.MONTH_YEAR + 1).setValue(newMonthYear);
+        updatedCount++;
       }
     }
 
-    Logger.log(`Migration completed. Updated ${updatedCount} records.`);
-    return { success: true, updatedCount: updatedCount };
+    Logger.log(`Migration completed. Updated ${updatedCount} records (${fixedCount} were format fixes).`);
+    return {
+      success: true,
+      updatedCount: updatedCount,
+      fixedCount: fixedCount
+    };
 
   } catch (e) {
     Logger.log(`Error in migrateCOCRecordsMonthYear: ${e}`);
@@ -3327,7 +3379,11 @@ function runCOCRecordsMigration() {
     try {
       const result = migrateCOCRecordsMonthYear();
       if (result.success) {
-        ui.alert('Migration Complete', `Successfully updated ${result.updatedCount} records.\n\nPlease check the Execution log (View > Execution log) for details.`, ui.ButtonSet.OK);
+        const message = `Successfully updated ${result.updatedCount} records.\n` +
+          `Format fixes: ${result.fixedCount || 0}\n\n` +
+          `Please refresh the page and try viewing records again.\n\n` +
+          `Check the Execution log (View > Execution log) for details.`;
+        ui.alert('Migration Complete', message, ui.ButtonSet.OK);
       } else {
         ui.alert('Migration Failed', result.message || 'An unknown error occurred.', ui.ButtonSet.OK);
       }
