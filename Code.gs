@@ -26,6 +26,95 @@ const DETAIL_COLS = {
   NOTES: 17               // Notes/Remarks
 };
 
+// COC_Records sheet column mapping (22 columns)
+const RECORD_COLS = {
+  RECORD_ID: 0,           // Record ID (unique identifier)
+  EMPLOYEE_ID: 1,         // Employee ID
+  EMPLOYEE_NAME: 2,       // Employee Name
+  MONTH_YEAR: 3,          // Month-Year (e.g., "2025-10")
+  DATE_RENDERED: 4,       // Date Rendered (date COC was earned)
+  DAY_TYPE: 5,            // Day Type (Weekday, Weekend, Holiday, etc.)
+  AM_IN: 6,               // AM In time
+  AM_OUT: 7,              // AM Out time
+  PM_IN: 8,               // PM In time
+  PM_OUT: 9,              // PM Out time
+  HOURS_WORKED: 10,       // Hours Worked
+  MULTIPLIER: 11,         // Multiplier (based on day type)
+  COC_EARNED: 12,         // COC Earned (hours)
+  CERTIFICATE_ID: 13,     // Certificate ID (linked to COC_Certificates)
+  DATE_RECORDED: 14,      // Date Recorded
+  EXPIRATION_DATE: 15,    // Expiration Date
+  STATUS: 16,             // Status (Pending, Active, Used, Expired, Cancelled)
+  APPROVED_BY: 17,        // Approved By
+  APPROVED_DATE: 18,      // Approved Date
+  CREATED_BY: 19,         // Created By
+  LAST_MODIFIED: 20,      // Last Modified
+  MODIFIED_BY: 21         // Modified By
+};
+
+// COC_Certificates sheet column mapping (13 columns)
+const CERT_COLS = {
+  CERTIFICATE_ID: 0,      // Certificate ID (unique identifier)
+  EMPLOYEE_ID: 1,         // Employee ID
+  EMPLOYEE_NAME: 2,       // Employee Name
+  MONTH_YEAR: 3,          // Month-Year (e.g., "2025-10")
+  TOTAL_COC_EARNED: 4,    // Total COC Earned (hours)
+  NUMBER_OF_RECORDS: 5,   // Number of Records (count)
+  ISSUE_DATE: 6,          // Issue Date
+  EXPIRATION_DATE: 7,     // Expiration Date
+  CERTIFICATE_URL: 8,     // Certificate URL (Google Doc)
+  PDF_URL: 9,             // PDF URL (exported PDF)
+  STATUS: 10,             // Status (Active, Cancelled, etc.)
+  CREATED_DATE: 11,       // Created Date
+  CREATED_BY: 12          // Created By
+};
+
+// Employees sheet column mapping
+const EMP_COLS = {
+  EMPLOYEE_ID: 0,         // Employee ID
+  FIRST_NAME: 1,          // First Name
+  MIDDLE_INITIAL: 2,      // Middle Initial
+  LAST_NAME: 3,           // Last Name
+  SUFFIX: 4,              // Suffix (Jr., Sr., etc.)
+  POSITION: 5,            // Position
+  OFFICE: 6,              // Office
+  STATUS: 7               // Status (Active, Inactive, etc.)
+};
+
+// COC_Ledger sheet column mapping
+const LEDGER_COLS = {
+  LEDGER_ID: 0,           // Ledger ID (unique identifier)
+  EMPLOYEE_ID: 1,         // Employee ID
+  EMPLOYEE_NAME: 2,       // Employee Name
+  TRANSACTION_DATE: 3,    // Transaction Date
+  TRANSACTION_TYPE: 4,    // Transaction Type (Earned, Used, Expired, Adjusted)
+  REFERENCE_ID: 5,        // Reference ID (Certificate ID, CTO ID, etc.)
+  BALANCE_BEFORE: 6,      // Balance Before
+  COC_EARNED: 7,          // COC Earned (hours)
+  CTO_USED: 8,            // CTO Used (hours)
+  COC_EXPIRED: 9,         // COC Expired (hours)
+  BALANCE_ADJUSTMENT: 10, // Balance Adjustment (hours)
+  BALANCE_AFTER: 11,      // Balance After
+  MONTH_YEAR_EARNED: 12,  // Month-Year Earned (e.g., "2025-10")
+  EXPIRATION_DATE: 13,    // Expiration Date
+  PROCESSED_BY: 14,       // Processed By
+  PROCESSED_DATE: 15,     // Processed Date
+  REMARKS: 16             // Remarks/Notes
+};
+
+// Status constants
+const STATUS_PENDING = 'Pending';
+const STATUS_ACTIVE = 'Active';
+const STATUS_USED = 'Used';
+const STATUS_EXPIRED = 'Expired';
+const STATUS_CANCELLED = 'Cancelled';
+
+// Transaction type constants
+const TR_TYPE_EARNED = 'Earned';
+const TR_TYPE_USED = 'Used';
+const TR_TYPE_EXPIRED = 'Expired';
+const TR_TYPE_ADJUSTED = 'Adjusted';
+
 /**
  * CORRECTED: Calculates expiration date based on CERTIFICATE ISSUE DATE
  * Formula: Certificate Issue Date + 1 Year - 1 Day
@@ -308,6 +397,54 @@ function getDatabase() {
   }
   // Fall back to the active spreadsheet if openById fails
   return SpreadsheetApp.getActive();
+}
+
+/**
+ * Gets all data from a sheet excluding the header row.
+ * Returns an array of arrays representing the data rows.
+ *
+ * @param {string} sheetName The name of the sheet to retrieve data from
+ * @return {Array<Array>} Array of row arrays (excluding header)
+ */
+function getSheetDataNoHeader(sheetName) {
+  const db = getDatabase();
+  const sheet = db.getSheetByName(sheetName);
+
+  if (!sheet) {
+    throw new Error(`Sheet "${sheetName}" not found in database.`);
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  // Return empty array if sheet only has header or is empty
+  if (data.length <= 1) {
+    return [];
+  }
+
+  // Return all rows except the first one (header)
+  return data.slice(1);
+}
+
+/**
+ * Gets the current user's email address.
+ *
+ * @return {string} The email address of the current user
+ */
+function getCurrentUserEmail() {
+  return Session.getActiveUser().getEmail();
+}
+
+/**
+ * Generates a unique ID with a given prefix.
+ * Uses timestamp and random component for uniqueness.
+ *
+ * @param {string} prefix The prefix for the ID (e.g., "COC-", "CERT-")
+ * @return {string} A unique ID string
+ */
+function generateUniqueId(prefix) {
+  const timestamp = new Date().getTime();
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `${prefix}${timestamp}${random}`;
 }
 
 // ============================================================================
