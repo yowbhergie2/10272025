@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Record COC Earned</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.CURRENT_PAGE = 'monthly-coc-entry';
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet" />
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f7fafc;
+      margin: 0;
+      padding: 0;
+    }
+
+    .select2-container .select2-selection--single {
+      height: 3rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      padding: 0.625rem 0.75rem;
+      background-color: white;
+      font-size: 15px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+      line-height: 1.75rem;
+      padding-left: 0.5rem;
+      color: #1f2937;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+      height: 2.875rem;
+      right: 0.5rem;
+    }
+    .select2-dropdown {
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .select2-results__option {
+      padding: 12px 16px;
+      font-size: 15px;
+      background-color: white;
+      transition: background-color 0.15s;
+    }
+    .select2-results__option:hover {
+      background-color: #f3f4f6 !important;
+    }
+    .select2-search__field {
+      border-radius: 0.375rem;
+      border: 1px solid #d1d5db;
+      padding: 0.5rem !important;
+      font-size: 14px !important;
+    }
+    .select2-search--dropdown {
+      padding: 8px;
+      background-color: #f9fafb;
+    }
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+      border: 1px solid #3b82f6;
+      outline: none;
+    }
+    .select2-container--default .select2-search--dropdown .select2-search__field:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .select2-results__option--highlighted {
+      background-color: #3b82f6 !important;
+      color: white !important;
+    }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(15, 23, 42, 0.55);
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.25s ease-in-out;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.96);
+      -moz-osx-font-smoothing: grayscale;
+      -webkit-font-smoothing: antialiased;
+      z-index: 60;
+      opacity: 0;
+      width: 100%;
+      max-width: 28rem;
+      background: white;
+      border-radius: 0.75rem;
+      box-shadow: 0 25px 50px -12px rgba(30, 41, 59, 0.35), 0 10px 15px -3px rgba(15, 23, 42, 0.25);
+      transition: opacity 0.25s ease-in-out, transform 0.25s ease-in-out;
+    }
+    .modal.show {
+      display: block;
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .modal-backdrop.show {
+      display: block;
+      opacity: 1;
+    }
+
+    .modal-body {
+      line-height: 1.6;
+    }
+    .modal-body strong {
+      font-weight: 600;
+    }
+    .modal-body ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 10px 0;
+    }
+    .modal-body ul li {
+      margin: 8px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+    .modal-body ul li:before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      font-weight: bold;
+    }
+
+    .time-input-error {
+      border-color: #ef4444 !important;
+      background-color: #fef2f2 !important;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+
+    .input-error {
+      border-color: #ef4444 !important;
+      background-color: #fef2f2 !important;
+    }
+
+    .day-entry-row {
+      background-color: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      transition: all 0.3s ease-in-out;
+    }
+
+    .day-entry-row:hover {
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      border-color: #d1d5db;
+    }
+
+    .removing-entry {
+      opacity: 0;
+      transform: scale(0.9);
+      height: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      border: none !important;
+      overflow: hidden;
+    }
+
+    .day-type-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .day-type-weekday {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .day-type-weekend {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .day-type-regular-holiday {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .day-type-special-holiday {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .day-type-loading {
+      background-color: #f3f4f6;
+      color: #6b7280;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin {
+      animation: spin 1s linear infinite;
+    }
+
+    .table-scroll {
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border-radius: 9999px;
+      padding: 0.15rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-green {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-amber {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-gray {
+      background-color: #e5e7eb;
+      color: #374151;
+    }
+
+    .status-box {
+      border-radius: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Main Content -->
+  <div class="p-4 md:p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h4 class="text-2xl font-semibold text-gray-800">
+        <i class="bi bi-calendar-plus"></i> Monthly COC Entry
+      </h4>
+      <!-- MODIFIED: Removed the Settings Button -->
+      <div class="flex gap-2">
+        <button type="button" class="px-4 py-2 bg-gray-600 text-white font-medium rounded-md shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors" id="backToDashboardBtn">
+          <i class="bi bi-arrow-left-circle"></i> Back to Dashboard
+        </button>
+      </div>
+    </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-md mb-5">
+    <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
+      <i class="bi bi-person text-blue-600"></i> Employee Information
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
+      <div>
+        <label for="employeeSelect" class="block text-sm font-medium text-gray-700 mb-1">
+          Search & Select Employee <span class="text-red-500">*</span>
+        </label>
+        <select id="employeeSelect" class="w-full">
+          <option value="">Loading employees...</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-500">
+          <i class="bi bi-search"></i> Start typing employee name, position, or office to search
+        </p>
+         <!-- *** COC Stats Display MOVED to the next section *** -->
+      </div>
+      <!-- *** MODIFIED Balance Card *** -->
+      <div id="balanceCard" class="p-5 rounded-lg text-white bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg text-center">
+        <div class="text-sm font-medium opacity-90">Current COC Balance</div>
+        <div class="text-4xl font-bold my-1">
+          <span id="balanceValue">0.0</span> / 120 hrs <!-- Added / 120 hrs -->
+        </div>
+        <div class="text-xs opacity-75 mb-2">Available: <span id="balanceAvailable">120.0</span> hrs</div> <!-- Added Available line -->
+        <!-- Removed employeeInfo div -->
+      </div>
+      <!-- *** END MODIFIED Balance Card *** -->
+    </div>
+  </div>
+
+  <!-- *** MODIFIED SECTION: New Parent Grid for Month/Year and Stats *** -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+    
+    <!-- Card 1: Select Month & Year (spanning 2 cols) -->
+    <div class="bg-white p-5 rounded-xl shadow-md lg:col-span-2">
+      <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
+        <i class="bi bi-calendar3 text-blue-600"></i> Select Month & Year for Entry
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+        <div>
+          <label for="monthSelect" class="block text-sm font-medium text-gray-700 mb-1">
+            Month <span class="text-red-500">*</span>
+          </label>
+          <select id="monthSelect" class="w-full"></select>
+        </div>
+        <div>
+          <label for="yearSelect" class="block text-sm font-medium text-gray-700 mb-1">
+            Year <span class="text-red-500">*</span>
+          </label>
+          <select id="yearSelect" class="w-full"></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: This Month Balance (spanning 1 col) -->
+    <div id="cocStatsDisplay" class="hidden bg-white p-5 rounded-xl shadow-md">
+      <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
+          <i class="bi bi-graph-up text-blue-600"></i> <span class="uppercase">Stats for Selected Month</span>
+      </div>
+      <!-- MODIFIED: Changed space-y-3 to grid grid-cols-2 to place stats side-by-side -->
+      <div class="grid grid-cols-2 gap-4">
+          <div class="text-sm">
+              <div class="text-gray-600">This Month's Earned</div>
+              <div class="font-bold text-gray-900 text-2xl">
+                <span id="currentMonthTotal">0.0</span> / 40 hrs
+              </div>
+          </div>
+          <div class="text-sm"> <!-- REMOVED mt-3 -->
+              <div class="text-gray-600">Can still earn:</div>
+              <div class="font-bold text-green-600 text-2xl">
+                  <span id="monthlyRemaining">40.0</span> hrs
+              </div>
+          </div>
+      </div>
+    </div>
+
+  </div> 
+  <!-- *** END OF MODIFIED SECTION *** -->
+
+  <div id="validationWarning" class="hidden bg-red-50 border-l-4 border-red-500 p-4 mb-5 rounded-lg">
+    <div class="flex">
+      <i class="bi bi-exclamation-triangle-fill text-red-600 text-xl mr-3"></i>
+      <div>
+        <h3 class="text-sm font-semibold text-red-800 mb-2">COC Limits Will Be Exceeded</h3>
+        <div id="validationMessage" class="text-sm text-red-700"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- *** REMOVED DUPLICATE SECTION *** -->
+  <!-- The duplicate grid and empty "Select Month & Year" card that were here have been removed. -->
+
+  <div class="bg-white p-5 rounded-xl shadow-md mb-5">
+    <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200 flex items-center justify-between">
+      <div>
+        <i class="bi bi-clock text-blue-600"></i> Overtime Days for <span id="selectedMonthYearDisplay" class="font-bold">Selected Month</span> <!-- Added display for selected month -->
+      </div>
+      <div class="text-sm font-normal text-gray-600">
+        <span id="entryCounter">0 entries</span>
+      </div>
+    </div>
+
+    <div id="dayEntries" class="space-y-4"></div>
+
+    <div id="noEntriesMessage" class="text-center py-8 text-gray-500">
+      <i class="bi bi-inbox text-4xl mb-3"></i>
+      <p>No entries yet. Click "Add Day" to begin.</p>
+    </div>
+
+    <button type="button" id="addDayBtn" class="mt-4 w-full px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all hover:scale-[1.02]">
+      <i class="bi bi-plus-circle"></i> Add Day
+    </button>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-md mb-5">
+    <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
+      <i class="bi bi-calculator text-blue-600"></i> Summary for <span id="summaryMonthYearDisplay" class="font-bold">Selected Month</span> <!-- Added display for selected month -->
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-center">
+      <div class="p-4 bg-blue-50 rounded-lg">
+        <div class="text-sm text-gray-600 mb-1">Total Days</div>
+        <div id="summaryDays" class="text-3xl font-bold text-blue-600">0</div>
+      </div>
+      <div class="p-4 bg-purple-50 rounded-lg">
+        <div class="text-sm text-gray-600 mb-1">Total Hours Worked</div>
+        <div id="summaryHours" class="text-3xl font-bold text-purple-600">0.00</div>
+      </div>
+      <div class="p-4 bg-green-50 rounded-lg">
+        <div class="text-sm text-gray-600 mb-1">Total COC Earned</div>
+        <div id="summaryCOC" class="text-3xl font-bold text-green-600">0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-md mb-5">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+      <div class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+        <i class="bi bi-journal-check text-purple-600"></i>
+        Recorded Entries & Certificates for <span id="existingMonthYearDisplay" class="font-bold">Selected Month</span> <!-- Added display for selected month -->
+      </div>
+      <!-- MODIFIED: Added Generate Monthly Certificate Button -->
+      <div class="flex gap-3">
+        <button type="button" id="refreshExistingBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white text-sm font-medium rounded-lg shadow hover:bg-gray-600 transition-colors">
+          <i class="bi bi-arrow-clockwise"></i>
+          Refresh
+        </button>
+        <button type="button" id="generateMonthlyCertBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow hover:bg-indigo-700 transition-colors hidden">
+          <i class="bi bi-file-earmark-plus"></i>
+          Generate Monthly Certificate
+        </button>
+      </div>
+    </div>
+
+    <div id="existingStatus" class="status-box hidden mb-4 p-4 text-sm"></div>
+
+    <div class="table-scroll border border-gray-200 rounded-lg overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+          <tr>
+            <th class="px-3 py-2 text-left">Date</th>
+            <th class="px-3 py-2 text-left">Day Type</th>
+            <!-- REMOVED: <th class="px-3 py-2 text-right">Hours</th> -->
+            <th class="px-3 py-2 text-right">COC Earned</th> <!-- MODIFIED: Renamed from COC -->
+            <th class="px-3 py-2 text-left">Monthly Certificate</th> <!-- MODIFIED: Changed header -->
+            <!-- REMOVED: Action Column -->
+          </tr>
+        </thead>
+        <tbody id="existingRecordsBody" class="divide-y divide-gray-200"></tbody>
+      </table>
+    </div>
+
+    <div id="existingRecordsEmpty" class="text-sm text-gray-500 text-center py-6">Select an employee and month to view recorded entries.</div>
+  </div>
+
+  <div class="flex gap-3 justify-end">
+    <button type="button" id="cancelBtn" class="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
+      <i class="bi bi-x-circle"></i> Cancel
+    </button>
+    <button type="button" id="submitBtn" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+      <i class="bi bi-check-circle"></i> Submit
+    </button>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+  <div class="modal" id="infoModal">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div id="modalHeader" class="bg-blue-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <h3 id="modalTitle" class="text-lg font-semibold">Information</h3>
+        <button id="closeModalBtn" class="text-white hover:text-gray-200 transition-colors">
+          <i class="bi bi-x-lg text-xl"></i>
+        </button>
+      </div>
+      <div class="modal-body p-6">
+        <div id="modalBody"></div>
+      </div>
+      <div class="px-6 pb-6 flex justify-end">
+        <button id="modalOkBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="confirmModalBackdrop"></div>
+  <div class="modal" id="confirmModal">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div class="bg-orange-500 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <h3 id="confirmModalTitle" class="text-lg font-semibold">Confirm Action</h3>
+        <button id="closeConfirmModalBtn" class="text-white hover:text-gray-200 transition-colors">
+          <i class="bi bi-x-lg text-xl"></i>
+        </button>
+      </div>
+      <div class="modal-body p-6">
+        <div id="confirmModalBody"></div>
+      </div>
+      <div class="px-6 pb-6 flex justify-end gap-3">
+        <button id="confirmNoBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
+          No, Cancel
+        </button>
+        <button id="confirmYesBtn" class="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors">
+          Yes, Continue
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW: Issue Date Modal -->
+  <div class="modal-backdrop" id="issueDateModalBackdrop"></div>
+  <div class="modal" id="issueDateModal">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div class="bg-indigo-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <h3 id="issueDateModalTitle" class="text-lg font-semibold">Set Certificate Issue Date</h3>
+        <button id="closeIssueDateModalBtn" class="text-white hover:text-gray-200 transition-colors">
+          <i class="bi bi-x-lg text-xl"></i>
+        </button>
+      </div>
+      <div class="modal-body p-6">
+        <p class="text-sm text-gray-600 mb-4">Please select the issue date for this monthly certificate. The "Valid Until" date will be calculated based on this.</p>
+        <div>
+          <label for="issueDateInput" class="block text-sm font-medium text-gray-700 mb-1">
+            Issue Date <span class="text-red-500">*</span>
+          </label>
+          <input type="date" id="issueDateInput" class="w-full px-3 py-2 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <p id="issueDateError" class="text-red-600 text-sm mt-1 hidden">Please select a valid date.</p>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex justify-end gap-3">
+        <button id="issueDateCancelBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
+          Cancel
+        </button>
+        <button id="issueDateConfirmBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+          Confirm & Generate
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0/js/select2.min.js"></script>
+  <script>
+    let entries = [];
+    let entryCounter = 0;
+    let currentEmployeeStats = null;
+
+    function showModal(title, body, type) {
+      $('#modalTitle').text(title);
+      $('#modalBody').html(body);
+
+      const headerColors = {
+        'success': 'bg-green-600',
+        'danger': 'bg-red-600',
+        'warning': 'bg-orange-500',
+        'info': 'bg-blue-600'
+      };
+
+      $('#modalHeader').removeClass('bg-blue-600 bg-green-600 bg-red-600 bg-orange-500')
+                      .addClass(headerColors[type] || 'bg-blue-600');
+
+      $('#modalBackdrop, #infoModal').addClass('show');
+    }
+
+    function closeModal() {
+      $('#modalBackdrop, #infoModal').removeClass('show');
+    }
+
+    function showConfirmModal(title, body, onYes, onNo) {
+      $('#confirmModalTitle').text(title);
+      $('#confirmModalBody').html(body);
+      $('#confirmModalBackdrop, #confirmModal').addClass('show');
+
+      $('#confirmYesBtn').off('click').on('click', function() {
+        closeConfirmModal();
+        if (onYes) onYes();
+      });
+
+      $('#confirmNoBtn').off('click').on('click', function() {
+        closeConfirmModal();
+        if (onNo) onNo();
+      });
+    }
+
+    function closeConfirmModal() {
+      $('#confirmModalBackdrop, #confirmModal').removeClass('show');
+    }
+
+    // NEW: Show/Hide Issue Date Modal
+    function showIssueDateModal() {
+      // Set default date to today
+      const today = new Date().toISOString().split('T')[0];
+      $('#issueDateInput').val(today);
+      $('#issueDateError').addClass('hidden');
+      $('#issueDateModalBackdrop, #issueDateModal').addClass('show');
+    }
+
+    function closeIssueDateModal() {
+      $('#issueDateModalBackdrop, #issueDateModal').removeClass('show');
+      // Re-enable generate button in case it was disabled
+      $('#generateMonthlyCertBtn').prop('disabled', false).html('<i class="bi bi-file-earmark-plus"></i> Generate Monthly Certificate');
+    }
+
+
+    function getDaysInMonth(month, year) {
+      return new Date(year, month, 0).getDate();
+    }
+
+    function validateDayNumber(day, month, year) {
+      const maxDays = getDaysInMonth(month, year);
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+
+      if (day < 1 || day > maxDays) {
+        return {
+          valid: false,
+          message: `${monthNames[month - 1]} ${year} only has ${maxDays} days. Day ${day} is invalid.`
+        };
+      }
+      return { valid: true };
+    }
+
+    function checkDuplicateDay(day) {
+      return entries.some(e => e.day === day);
+    }
+
+    function showDuplicateModal(day, monthName, year, onConfirm, onCancel) {
+      const modalHtml = `
+        <div class="modal-backdrop show" id="duplicateModalBackdrop"></div>
+        <div class="modal show" id="duplicateModal">
+          <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="bg-orange-500 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+              <div class="flex items-center">
+                <i class="bi bi-exclamation-triangle-fill text-2xl mr-3"></i>
+                <h3 class="text-lg font-semibold">Duplicate Day Detected</h3>
+              </div>
+            </div>
+            <div class="modal-body p-6">
+              <p class="text-gray-700 mb-4">
+                You already have an entry for <strong>${monthName} ${day}, ${year}</strong>.
+              </p>
+              <p class="text-gray-600 mb-4">
+                This entry will replace the existing one for this day. Do you want to continue?
+              </p>
+              <div class="bg-orange-50 border-l-4 border-orange-400 p-3 mb-4">
+                <div class="flex">
+                  <i class="bi bi-exclamation-circle text-orange-500 mt-0.5 mr-2"></i>
+                  <p class="text-sm text-orange-700">
+                    <strong>Note:</strong> You can only have one entry per day. Continuing will remove the previous entry.
+                  </p>
+                </div>
+              </div>
+              <div class="flex gap-3 justify-end">
+                 <button type="button" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors" onclick="cancelDuplicate()">
+                  No, Cancel
+                </button>
+                <button type="button" class="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors" onclick="confirmDuplicate()">
+                  Yes, Replace
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      $('body').append(modalHtml);
+
+      window.confirmDuplicate = function() {
+        closeDuplicateModal();
+        onConfirm();
+      };
+
+window.cancelDuplicate = function() {
+        if (typeof onCancel === 'function') {
+          onCancel();
+        }
+        closeDuplicateModal();
+      };
+
+      window.closeDuplicateModal = function() {
+        $('#duplicateModal, #duplicateModalBackdrop').remove();
+        delete window.confirmDuplicate;
+         delete window.cancelDuplicate;
+        delete window.closeDuplicateModal;
+      };
+    }
+
+    function updateEntryCounter() {
+      const count = entries.length;
+      if (count === 0) {
+        $('#entryCounter').text('0 entries');
+      } else if (count === 1) {
+        $('#entryCounter').text('1 entry');
+      } else {
+        $('#entryCounter').text(count + ' entries');
+      }
+    }
+
+    function loadEmployees() {
+      $('#employeeSelect').html('<option value="">Loading employees...</option>');
+
+      google.script.run
+        .withSuccessHandler(function(emps) {
+          const options = emps.map(e =>
+            `<option value="${e.id}">${e.fullName}</option>`
+          ).join('');
+          $('#employeeSelect').html('<option value="">Type to search employee...</option>' + options);
+
+          $('#employeeSelect').select2({
+            placeholder: 'Type to search employee...',
+            width: '100%',
+            allowClear: true
+          });
+        })
+        .withFailureHandler(function(err) {
+          $('#employeeSelect').html('<option value="">Error loading employees</option>');
+          showModal('Error', 'Failed to load employees: ' + (err.message || err), 'danger');
+        })
+        .apiListEmployees(true);
+    }
+
+    // *** MODIFIED Function: Added month and year parameters ***
+    function loadEmployeeCOCStats(employeeId, month, year) { 
+      if (!employeeId || !month || !year) { // Check for all params
+        $('#cocStatsDisplay').addClass('hidden');
+        currentEmployeeStats = null;
+        return;
+      }
+
+      // Show a loading state in the stats box
+      $('#cocStatsDisplay').removeClass('hidden');
+      $('#currentMonthTotal').text('...');
+      $('#monthlyRemaining').text('...');
+      // Title is now part of the HTML, so no need to change it here.
+
+      google.script.run
+        .withSuccessHandler(function(stats) {
+          console.log(`apiGetEmployeeCOCStats success for ${employeeId}, ${month}/${year}. Received stats:`, stats); // Log received stats
+          currentEmployeeStats = stats;
+          $('#currentMonthTotal').text(stats.currentMonthTotal.toFixed(1)); // Use 1 decimal place
+          $('#monthlyRemaining').text(stats.monthlyRemaining.toFixed(1)); // Use 1 decimal place
+          
+          validateCOCLimits();
+        })
+        .withFailureHandler(function(err) {
+          console.error(`apiGetEmployeeCOCStats failure for ${employeeId}, ${month}/${year}:`, err); // Log failure
+          $('#cocStatsDisplay').addClass('hidden');
+          currentEmployeeStats = null; // Clear stats on failure
+        })
+        .apiGetEmployeeCOCStats(employeeId, month, year); // <-- Pass month and year
+    }
+
+    function updateEmployeeInfo() {
+      const empId = $('#employeeSelect').val();
+      if (!empId) {
+        $('#balanceValue').text('0.0');
+        $('#balanceAvailable').text('120.0'); // Reset available balance
+        $('#employeeInfo').text(''); // Clear employee name from balance card (it's removed, but just in case)
+        $('#cocStatsDisplay').addClass('hidden');
+        $('#existingRecordsBody').empty();
+        $('#existingRecordsEmpty').removeClass('hidden').text('Select an employee and month to view recorded entries.');
+        resetStatus();
+        return;
+      }
+
+      resetStatus();
+
+      google.script.run
+        .withSuccessHandler(function(bal) {
+          console.log(`apiGetBalance success for ${empId}. Received balance:`, bal); // Added log
+          const balance = parseFloat(bal) || 0; // Ensure it's a number
+          const balanceRemaining = 120.0 - balance; // Calculate remaining
+          $('#balanceValue').text(balance.toFixed(1)); // Use 1 decimal place
+          $('#balanceAvailable').text(balanceRemaining.toFixed(1)); // Use 1 decimal place and update available
+          // Removed setting employeeInfo text
+
+          // *** MODIFIED Call: Pass selected month and year ***
+          const month = parseInt($('#monthSelect').val(), 10);
+          const year = parseInt($('#yearSelect').val(), 10);
+          loadEmployeeCOCStats(empId, month, year); 
+          loadExistingRecords();
+        })
+        .withFailureHandler(function(err) {
+          console.error(`apiGetBalance failure for ${empId}:`, err); // Added log
+          showModal('Error', err.message || err, 'danger');
+          // Clear dependent fields on balance error too
+          $('#balanceValue').text('Error');
+          $('#balanceAvailable').text('-');
+          $('#employeeInfo').text(''); // Clear employee name from balance card (it's removed, but just in case)
+          $('#cocStatsDisplay').addClass('hidden');
+          $('#existingRecordsBody').empty();
+          $('#existingRecordsEmpty').removeClass('hidden').text('Error loading balance.');
+        })
+        .apiGetBalance(empId);
+    }
+
+    function validateCOCLimits() {
+      if (!currentEmployeeStats || entries.length === 0) {
+        $('#validationWarning').addClass('hidden');
+        $('#validationSuccess').addClass('hidden');
+        return { valid: true };
+      }
+
+      let totalNewCOC = 0;
+      entries.forEach(e => {
+        if (e.result && e.result.cocEarned) {
+          totalNewCOC += e.result.cocEarned;
+        }
+      });
+
+      const errors = [];
+
+      // Use currentEmployeeStats.currentMonthTotal for monthly check
+      const newMonthTotal = currentEmployeeStats.currentMonthTotal + totalNewCOC;
+      if (newMonthTotal > 40) {
+        errors.push(`Monthly limit exceeded: Current ${currentEmployeeStats.currentMonthTotal.toFixed(1)} hrs + New ${totalNewCOC.toFixed(1)} hrs = ${newMonthTotal.toFixed(1)} hrs (Max: 40 hrs/month)`);
+      }
+
+       // Use balance from #balanceValue for total balance check
+      const currentBalanceFromCard = parseFloat($('#balanceValue').text()) || 0;
+      const newTotalBalance = currentBalanceFromCard + totalNewCOC;
+      if (newTotalBalance > 120) {
+        errors.push(`Total balance limit exceeded: Current ${currentBalanceFromCard.toFixed(1)} hrs + New ${totalNewCOC.toFixed(1)} hrs = ${newTotalBalance.toFixed(1)} hrs (Max: 120 hrs)`);
+      }
+
+
+      if (errors.length > 0) {
+        $('#validationMessage').html(errors.map(e => `• ${e}`).join('<br>'));
+        $('#validationWarning').removeClass('hidden');
+        $('#validationSuccess').addClass('hidden');
+        return { valid: false, errors: errors };
+      } else if (totalNewCOC > 0) {
+        $('#validationWarning').addClass('hidden');
+        $('#validationSuccess').removeClass('hidden');
+        return { valid: true };
+      } else {
+        $('#validationWarning').addClass('hidden');
+        $('#validationSuccess').addClass('hidden');
+        return { valid: true };
+      }
+    }
+
+    function loadMonthOptions() {
+      const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+
+      const options = months.map((m, i) =>
+        `<option value="${i + 1}" ${(i + 1 === currentMonth ? 'selected' : '')}>${m}</option>`
+      ).join('');
+      $('#monthSelect').html(options);
+    }
+
+    function loadYearOptions() {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      let options = '';
+      // Allow years from 2 years ago to 1 year in the future
+      for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+        options += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
+      }
+      $('#yearSelect').html(options);
+    }
+
+    // *** NEW Function to update month/year display in titles ***
+    function updateSelectedMonthYearDisplay() {
+        const monthName = $('#monthSelect option:selected').text();
+        const year = $('#yearSelect').val();
+        const display = monthName && year ? `${monthName} ${year}` : 'Selected Month';
+        $('#selectedMonthYearDisplay').text(display);
+        $('#summaryMonthYearDisplay').text(display);
+        $('#existingMonthYearDisplay').text(display);
+    }
+
+    function addDayEntry() {
+      const employeeId = $('#employeeSelect').val();
+      const month = parseInt($('#monthSelect').val(), 10);
+      const year = parseInt($('#yearSelect').val(), 10);
+
+      if (!employeeId) {
+        showModal('Validation Error', 'Please select an employee first.', 'danger');
+        return;
+      }
+      if (!month || !year) {
+        showModal('Validation Error', 'Please select month and year first.', 'danger');
+        return;
+      }
+
+      entryCounter++;
+      const entryId = entryCounter;
+      const entry = {
+        id: entryId,
+        day: null,
+        dayType: null,
+        amIn: '',
+        amOut: '',
+        pmIn: '',
+        pmOut: '',
+        result: null
+        // REMOVED: generateCertificate: false
+      };
+      entries.push(entry);
+
+      $('#noEntriesMessage').hide();
+
+      const html = `
+        <div class="day-entry-row" data-entry-id="${entryId}">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+
+            <div class="lg:col-span-2">
+              <label class="block text-xs font-medium text-gray-700 mb-1">Day <span class="text-red-500">*</span></label>
+              <input type="number" class="day-input w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" min="1" max="31" placeholder="21">
+            </div>
+
+            <div class="lg:col-span-2">
+              <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+              <div class="day-type-display py-2">
+                <span class="day-type-badge day-type-loading">-</span>
+              </div>
+            </div>
+
+            <div class="lg:col-span-3">
+              <label class="block text-xs font-medium text-gray-700 mb-1">AM (In / Out) <span class="text-red-500">*</span></label>
+              <div class="flex flex-wrap lg:flex-nowrap items-center gap-1">
+                <input type="time" class="am-in flex-1 px-2 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" step="900">
+                <span class="text-xs text-gray-500">to</span>
+                <input type="time" class="am-out flex-1 px-2 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" step="900">
+              </div>
+            </div>
+
+            <div class="lg:col-span-3">
+              <label class="block text-xs font-medium text-gray-700 mb-1">PM (In / Out) <span class="text-red-500">*</span></label>
+              <div class="flex flex-wrap lg:flex-nowrap items-center gap-1">
+                <input type="time" class="pm-in flex-1 px-2 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" step="900">
+                <span class="text-xs text-gray-500">to</span>
+                <input type="time" class="pm-out flex-1 px-2 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" step="900">
+              </div>
+            </div>
+
+            <div class="lg:col-span-2 flex w-full">
+              <button type="button" class="remove-btn w-full lg:w-auto px-3 py-2 text-sm text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 lg:ml-auto">
+                <i class="bi bi-trash"></i> Remove
+              </button>
+            </div>
+          </div>
+
+          <div class="result-display hidden mt-3 pt-3 border-t border-gray-200">
+            <div class="grid grid-cols-3 gap-4 text-center text-xs">
+              <div>
+                <div class="text-gray-600">Hours Worked</div>
+                <div class="hours-worked font-semibold text-blue-600 text-sm">-</div>
+              </div>
+              <div>
+                <div class="text-gray-600">Multiplier</div>
+                <div class="multiplier font-semibold text-purple-600 text-sm">-</div>
+              </div>
+              <div>
+                <div class="text-gray-600">COC Earned</div>
+                <div class="coc-earned font-bold text-green-600 text-sm">-</div>
+              </div>
+            </div>
+          </div>
+          <!-- REMOVED: Generate certificate checkbox -->
+        </div>
+      `;
+
+      $('#dayEntries').append(html);
+
+      const container = $(`.day-entry-row[data-entry-id="${entryId}"]`);
+
+      container.find('.day-input').focus();
+
+      container.find('.day-input').on('input', function() {
+        const dayInput = $(this);
+        const day = parseInt(dayInput.val(), 10);
+        if (!day || isNaN(day)) {
+           entry.day = null;
+          dayInput.removeClass('input-error');
+          container.find('.day-type-badge').removeClass('day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday').addClass('day-type-loading').text('-');
+          return;
+        }
+
+        const dayValidation = validateDayNumber(day, month, year);
+        if (!dayValidation.valid) {
+          container.find('.day-type-badge').removeClass('day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday day-type-loading').text('Invalid');
+          dayInput.addClass('input-error');
+          return;
+        }
+
+        dayInput.removeClass('input-error');
+
+        if (checkDuplicateDay(day)) {
+          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+
+          showDuplicateModal(day, monthNames[month - 1], year, function() {
+            const oldEntry = entries.find(e => e.day === day && e.id !== entryId);
+            entries = entries.filter(e => e.day !== day || e.id === entryId);
+            if (oldEntry) {
+              const rowToRemove = $(`.day-entry-row[data-entry-id="${oldEntry.id}"]`);
+              rowToRemove.addClass('removing-entry');
+              setTimeout(() => {
+                rowToRemove.remove();
+                updateEntryCounter();
+              }, 300);
+            } else {
+              updateEntryCounter();
+            }
+            entry.day = day;
+            detectDayTypeOnly(entryId);
+            updateSummary();
+            validateCOCLimits();
+             }, function() {
+            entry.day = null;
+            dayInput.val('');
+            dayInput.removeClass('input-error');
+            container.find('.day-type-badge')
+              .removeClass('day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday')
+              .addClass('day-type-loading')
+              .text('-');
+            // Ensure input is fully cleared by blurring and refocusing
+            dayInput.blur();
+            setTimeout(() => dayInput.focus(), 10);
+          });
+          return;
+        }
+
+        entry.day = day;
+        detectDayTypeOnly(entryId);
+      });
+
+      container.find('.remove-btn').on('click', function() {
+        removeEntry(entryId);
+      });
+
+      container.find('.am-in, .am-out, .pm-in, .pm-out').on('change', function() {
+        const entry = entries.find(e => e.id === entryId);
+        if (entry) {
+          entry.amIn = container.find('.am-in').val();
+          entry.amOut = container.find('.am-out').val();
+          entry.pmIn = container.find('.pm-in').val();
+          entry.pmOut = container.find('.pm-out').val();
+          if (entry.day) {
+            autoDetectDayType(entryId, container);
+          }
+        }
+      });
+
+      // REMOVED: .generate-cert listener
+      
+      updateEntryCounter();
+    }
+
+    function detectDayTypeOnly(entryId) {
+      const entry = entries.find(e => e.id === entryId);
+      if (!entry || !entry.day) return;
+
+      const container = $(`.day-entry-row[data-entry-id="${entryId}"]`);
+      const month = parseInt($('#monthSelect').val(), 10);
+      const year = parseInt($('#yearSelect').val(), 10);
+
+      container.find('.day-type-badge').removeClass('day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday').addClass('day-type-loading').html('<i class="bi bi-arrow-repeat animate-spin"></i>');
+
+      google.script.run
+        .withSuccessHandler(function(dayType) {
+          entry.dayType = dayType;
+
+          let badgeClass = 'day-type-loading';
+          if (dayType === 'Weekday') badgeClass = 'day-type-weekday';
+          else if (dayType === 'Weekend') badgeClass = 'day-type-weekend';
+          else if (dayType === 'Regular Holiday') badgeClass = 'day-type-regular-holiday';
+          else if (dayType === 'Special Non-Working') badgeClass = 'day-type-special-holiday';
+
+          container.find('.day-type-badge')
+            .removeClass('day-type-loading day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday')
+            .addClass(badgeClass)
+            .text(dayType);
+
+          if (entry.amIn || entry.amOut || entry.pmIn || entry.pmOut) {
+            autoDetectDayType(entryId, container);
+          }
+        })
+        .withFailureHandler(function(err) {
+          container.find('.day-type-badge')
+            .removeClass('day-type-loading day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday')
+            .addClass('day-type-loading')
+            .text('-');
+        })
+        .apiGetDayType(year, month, entry.day);
+    }
+
+    function autoDetectDayType(entryId, container) {
+      const entry = entries.find(e => e.id === entryId);
+      if (!entry || !entry.day) return;
+
+      if (!container) {
+        container = $(`.day-entry-row[data-entry-id="${entryId}"]`);
+      }
+
+      const month = parseInt($('#monthSelect').val(), 10);
+      const year = parseInt($('#yearSelect').val(), 10);
+
+      entry.amIn = container.find('.am-in').val();
+      entry.amOut = container.find('.am-out').val();
+      entry.pmIn = container.find('.pm-in').val();
+      entry.pmOut = container.find('.pm-out').val();
+
+      const validation = validateTimeInputs(entry, container);
+      if (!validation.valid) {
+        container.find('.result-display').addClass('hidden');
+        container.find('.hours-worked').text('-');
+        container.find('.multiplier').text('-');
+        container.find('.coc-earned').text('-');
+        entry.result = null;
+        updateSummary();
+        validateCOCLimits();
+        return;
+      }
+
+      if (!entry.amIn && !entry.amOut && !entry.pmIn && !entry.pmOut) {
+         // Clear results if all times are removed
+        container.find('.result-display').addClass('hidden');
+        container.find('.hours-worked').text('-');
+        container.find('.multiplier').text('-');
+        container.find('.coc-earned').text('-');
+        entry.result = null;
+        updateSummary();
+        validateCOCLimits();
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          entry.result = result;
+          entry.dayType = result.dayType; // Update dayType based on calculation
+
+          let badgeClass = 'day-type-loading';
+          if (result.dayType === 'Weekday') badgeClass = 'day-type-weekday';
+          else if (result.dayType === 'Weekend') badgeClass = 'day-type-weekend';
+          else if (result.dayType === 'Regular Holiday') badgeClass = 'day-type-regular-holiday';
+          else if (result.dayType === 'Special Non-Working') badgeClass = 'day-type-special-holiday';
+
+          container.find('.day-type-badge')
+            .removeClass('day-type-loading day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday')
+            .addClass(badgeClass)
+            .text(result.dayType);
+
+          container.find('.result-display').removeClass('hidden');
+          container.find('.hours-worked').text(result.hoursWorked.toFixed(2));
+          container.find('.multiplier').text(result.multiplier.toFixed(1));
+          container.find('.coc-earned').text(result.cocEarned.toFixed(2));
+
+          updateSummary();
+          validateCOCLimits();
+        })
+        .withFailureHandler(function(err) {
+          console.error('Error calculating overtime:', err);
+          // Optionally show an error message in the UI
+           container.find('.result-display').addClass('hidden');
+           container.find('.hours-worked').text('Error');
+           container.find('.multiplier').text('-');
+           container.find('.coc-earned').text('-');
+           entry.result = null;
+           updateSummary();
+           validateCOCLimits();
+        })
+        .apiCalculateOvertimeForDate(year, month, entry.day, entry.amIn, entry.amOut, entry.pmIn, entry.pmOut);
+    }
+
+    function removeEntry(entryId) {
+      const rowToRemove = $(`.day-entry-row[data-entry-id="${entryId}"]`);
+      entries = entries.filter(e => e.id !== entryId);
+
+      rowToRemove.addClass('removing-entry');
+      setTimeout(() => {
+        rowToRemove.remove();
+        if (entries.length === 0) {
+          $('#noEntriesMessage').show();
+        }
+        updateEntryCounter();
+        updateSummary();
+        validateCOCLimits();
+      }, 300);
+    }
+
+    function updateSummary() {
+      let totalDays = entries.length;
+      let totalHours = 0;
+      let totalCOC = 0;
+
+      entries.forEach(e => {
+        if (e.result) {
+          totalHours += e.result.hoursWorked;
+          totalCOC += e.result.cocEarned;
+        }
+      });
+
+      $('#summaryDays').text(totalDays);
+      $('#summaryHours').text(totalHours.toFixed(2));
+      $('#summaryCOC').text(totalCOC.toFixed(2));
+    }
+
+    function validateTimeInputs(entry, container) {
+      container.find('input[type="time"]').removeClass('time-input-error');
+
+      const hasAM = entry.amIn || entry.amOut;
+      const hasPM = entry.pmIn || entry.pmOut;
+
+      if (!hasAM && !hasPM) {
+        return { valid: true }; // Not an error if completely empty
+      }
+
+      if (hasAM && (!entry.amIn || !entry.amOut)) {
+        if (!entry.amIn) container.find('.am-in').addClass('time-input-error');
+        if (!entry.amOut) container.find('.am-out').addClass('time-input-error');
+        return { valid: false, message: 'AM shift must have both In and Out times.' };
+      }
+
+      if (hasPM && (!entry.pmIn || !entry.pmOut)) {
+        if (!entry.pmIn) container.find('.pm-in').addClass('time-input-error');
+        if (!entry.pmOut) container.find('.pm-out').addClass('time-input-error');
+        return { valid: false, message: 'PM shift must have both In and Out times.' };
+      }
+
+      const timeToMins = (timeStr) => {
+        if (!timeStr) return null;
+        const parts = timeStr.split(':').map(Number);
+        if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+        return parts[0] * 60 + parts[1];
+      };
+
+      if (hasAM) {
+        const amInMins = timeToMins(entry.amIn);
+        const amOutMins = timeToMins(entry.amOut);
+
+        if (amInMins === null || amOutMins === null) {
+           if (amInMins === null) container.find('.am-in').addClass('time-input-error');
+           if (amOutMins === null) container.find('.am-out').addClass('time-input-error');
+           return { valid: false, message: 'Invalid AM time format.'};
+        }
+        if (amInMins < 300) { container.find('.am-in').addClass('time-input-error'); return { valid: false, message: 'AM In time cannot be earlier than 05:00 AM.' }; }
+        if (amInMins > 779) { container.find('.am-in').addClass('time-input-error'); return { valid: false, message: 'AM In time cannot be after 12:59 PM.' }; }
+        if (amOutMins < 480) { container.find('.am-out').addClass('time-input-error'); return { valid: false, message: 'AM Out time cannot be earlier than 08:00 AM.' }; }
+        if (amOutMins > 779) { container.find('.am-out').addClass('time-input-error'); return { valid: false, message: 'AM Out time cannot be after 12:59 PM.' }; }
+        if (amInMins >= amOutMins) { container.find('.am-in, .am-out').addClass('time-input-error'); return { valid: false, message: 'AM Out time must be after AM In time.' }; }
+      }
+
+      if (hasPM) {
+        const pmInMins = timeToMins(entry.pmIn);
+        const pmOutMins = timeToMins(entry.pmOut);
+
+        if (pmInMins === null || pmOutMins === null) {
+           if (pmInMins === null) container.find('.pm-in').addClass('time-input-error');
+           if (pmOutMins === null) container.find('.pm-out').addClass('time-input-error');
+           return { valid: false, message: 'Invalid PM time format.'};
+        }
+        if (pmInMins < 720) { container.find('.pm-in').addClass('time-input-error'); return { valid: false, message: 'PM In time cannot be earlier than 12:00 PM.' }; }
+        if (pmInMins > 1439) { container.find('.pm-in').addClass('time-input-error'); return { valid: false, message: 'PM In time cannot be after 11:59 PM.' }; }
+        if (pmOutMins < 720) { container.find('.pm-out').addClass('time-input-error'); return { valid: false, message: 'PM Out time cannot be earlier than 12:00 PM.' }; }
+        if (pmOutMins > 1439) { container.find('.pm-out').addClass('time-input-error'); return { valid: false, message: 'PM Out time cannot be after 11:59 PM.' }; }
+        if (pmInMins >= pmOutMins) { container.find('.pm-in, .pm-out').addClass('time-input-error'); return { valid: false, message: 'PM Out time must be after PM In time.' }; }
+      }
+
+      // --- NEW VALIDATION ADDED HERE ---
+      // Check if PM In is earlier than AM Out
+      if (hasAM && hasPM) {
+        const amOutMins = timeToMins(entry.amOut);
+        const pmInMins = timeToMins(entry.pmIn);
+
+        // This check ensures we are comparing valid numbers
+        if (amOutMins !== null && pmInMins !== null) {
+          if (pmInMins < amOutMins) {
+            container.find('.am-out').addClass('time-input-error');
+            container.find('.pm-in').addClass('time-input-error');
+            return { valid: false, message: 'PM In time cannot be earlier than AM Out time.' };
+          }
+        }
+      }
+      // --- END OF NEW VALIDATION ---
+
+      return { valid: true };
+    }
+
+    function resetStatus() {
+      const status = $('#existingStatus');
+      status.addClass('hidden').removeClass('bg-green-50 border border-green-200 text-green-700 bg-red-50 border-red-200 text-red-700 bg-blue-50 border-blue-200 text-blue-700');
+      status.empty();
+    }
+
+    function showStatus(message, type) {
+      const status = $('#existingStatus');
+      status.removeClass('hidden bg-green-50 border border-green-200 text-green-700 bg-red-50 border-red-200 text-red-700 bg-blue-50 border-blue-200 text-blue-700 border');
+      if (type === 'success') {
+        status.addClass('bg-green-50 border border-green-200 text-green-700');
+      } else if (type === 'info') {
+        status.addClass('bg-blue-50 border border-blue-200 text-blue-700');
+      } else {
+        status.addClass('bg-red-50 border-red-200 text-red-700');
+      }
+      status.html(message);
+    }
+
+    function loadExistingRecords() {
+      resetStatus();
+      const employeeId = $('#employeeSelect').val();
+      const month = parseInt($('#monthSelect').val(), 10);
+      const year = parseInt($('#yearSelect').val(), 10);
+      const body = $('#existingRecordsBody');
+      body.empty();
+      $('#generateMonthlyCertBtn').addClass('hidden'); // Hide button by default
+
+      if (!employeeId || !month || !year) {
+        $('#existingRecordsEmpty').removeClass('hidden').text('Select an employee and month to view recorded entries.');
+        return;
+      }
+
+      $('#existingRecordsEmpty').addClass('hidden');
+      updateSelectedMonthYearDisplay(); // Update titles
+
+      google.script.run
+        .withSuccessHandler(function(records) {
+          body.empty();
+          if (!records || records.length === 0) {
+            $('#existingRecordsEmpty').removeClass('hidden').text('No entries recorded for this month yet.');
+            return;
+          }
+
+          // Check if there are any uncertificated records
+          const hasUncertificatedRecords = records.some(r => !r.certificateUrl);
+          if (hasUncertificatedRecords) {
+              $('#generateMonthlyCertBtn').removeClass('hidden');
+          }
+
+          records.forEach(record => {
+            // MODIFIED: Certificate cell logic
+            const certificateCell = record.certificateUrl
+              ? `<div class="flex flex-col gap-1">
+                   <a href="${record.certificateUrl}" target="_blank" class="text-indigo-600 hover:underline text-xs">
+                     <i class="bi bi-file-earmark-text"></i> View Cert
+                   </a>
+                   <a href="${record.pdfUrl}" target="_blank" class="text-green-600 hover:underline text-xs" download>
+                     <i class="bi bi-file-earmark-pdf"></i> Download PDF
+                   </a>
+                 </div>`
+              : '<span class="badge badge-amber"><i class="bi bi-hourglass-split"></i> Awaiting Certificate</span>';
+
+            // REMOVED: actionCell logic
+
+            // MODIFIED: Row template to remove "Hours" cell
+            const row = $(`
+              <tr>
+                <td class="px-3 py-2">${record.displayDate}</td>
+                <td class="px-3 py-2">${record.dayType || ''}</td>
+                <!-- REMOVED: <td class="px-3 py-2 text-right">${Number(record.hoursWorked || 0).toFixed(2)}</td> -->
+                <td class="px-3 py-2 text-right">${Number(record.cocEarned || 0).toFixed(2)}</td>
+                <td class="px-3 py-2">${certificateCell}</td>
+              </tr>
+            `);
+
+            // REMOVED: .generate-cert-btn listener
+
+            body.append(row);
+          });
+        })
+        .withFailureHandler(function(error) {
+          body.empty();
+          $('#existingRecordsEmpty').removeClass('hidden').text('Failed to load records.');
+          showStatus(error && error.message ? error.message : String(error), 'error');
+        })
+        .apiListCOCRecordsForMonth(employeeId, month, year);
+    }
+
+    // REMOVED: generateCertificate(recordId, button) function
+
+    // MODIFIED: Function now opens the modal first
+    function generateMonthlyCertificate() {
+      const btn = $('#generateMonthlyCertBtn');
+      btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Please wait...');
+      showIssueDateModal();
+    }
+
+    // NEW: This function is called when the user confirms the issue date
+    function confirmCertificateGeneration() {
+      const employeeId = $('#employeeSelect').val();
+      const month = parseInt($('#monthSelect').val(), 10);
+      const year = parseInt($('#yearSelect').val(), 10);
+      const issueDate = $('#issueDateInput').val();
+
+      if (!issueDate) {
+        $('#issueDateError').removeClass('hidden');
+        return;
+      }
+      $('#issueDateError').addClass('hidden');
+
+      if (!employeeId || !month || !year) {
+        showModal('Error', 'Please select an employee, month, and year.', 'danger');
+        closeIssueDateModal();
+        return;
+      }
+
+      const btn = $('#generateMonthlyCertBtn');
+      btn.prop('disabled', true).html('<i class="bi bi-arrow-repeat animate-spin"></i> Generating...');
+      closeIssueDateModal(); // Close the date modal
+      resetStatus();
+  
+      google.script.run
+        .withSuccessHandler(function(result) {
+          // Assuming result = { certificateId: "CERT-...", numRecords: 3, totalHours: 11.0 }
+          if (result && result.certificateId) {
+            showStatus(`Successfully generated Certificate ${result.certificateId} for ${result.numRecords} ${result.numRecords === 1 ? 'entry' : 'entries'}, totaling ${result.totalHours.toFixed(1)} hours.`, 'success');
+            btn.addClass('hidden'); // Hide button since it's now generated
+            loadExistingRecords(); // Refresh the table to show new cert links
+            updateEmployeeInfo(); // Refresh balance/stats just in case
+          } else {
+            btn.prop('disabled', false).html('<i class="bi bi-file-earmark-plus"></i> Generate Monthly Certificate');
+            showStatus('Certificate generated but no details were returned. Please refresh.', 'warning');
+          }
+        })
+        .withFailureHandler(function(error) {
+          btn.prop('disabled', false).html('<i class="bi bi-file-earmark-plus"></i> Generate Monthly Certificate');
+          showStatus(error && error.message ? error.message : String(error), 'error');
+        })
+        .apiGenerateMonthlyCOCCertificate(employeeId, month, year, issueDate); // Pass new issueDate
+    }
+
+
+    function submitEntries() {
+      const employeeId = $('#employeeSelect').val();
+      const month = parseInt($('#monthSelect').val(), 10);
+      const year = parseInt($('#yearSelect').val(), 10);
+
+      if (!employeeId) { showModal('Validation Error', 'Please select an employee.', 'danger'); return; }
+      if (!month || !year) { showModal('Validation Error', 'Please select month and year.', 'danger'); return; }
+      if (entries.length === 0) { showModal('Validation Error', 'Please add at least one overtime day.', 'danger'); return; }
+
+      const limitsCheck = validateCOCLimits();
+      if (!limitsCheck.valid) {
+        showModal('COC Limits Exceeded', limitsCheck.errors.join('<br>'), 'danger');
+        $('#validationWarning')[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      $('.time-input-error').removeClass('time-input-error');
+
+      const payload = [];
+      let validationFailed = false; // Flag to stop iteration on first error
+
+      for (const ent of entries) {
+        if (!ent.day || isNaN(ent.day)) {
+          showModal('Validation Error', 'One of the day entries has no day number.', 'danger');
+          validationFailed = true;
+          break; // Stop checking further entries
+        }
+
+        const container = $(`.day-entry-row[data-entry-id="${ent.id}"]`);
+        const validation = validateTimeInputs(ent, container);
+        if (!validation.valid) {
+          showModal('Validation Error', `Day ${ent.day}: ${validation.message}`, 'danger');
+          container[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          validationFailed = true;
+          break; // Stop checking further entries
+        }
+
+        // Only push if there are valid time entries for calculation
+        if ( (ent.amIn && ent.amOut) || (ent.pmIn && ent.pmOut) ) {
+            payload.push({
+                day: ent.day,
+                amIn: ent.amIn || '',
+                amOut: ent.amOut || '',
+                pmIn: ent.pmIn || '',
+                pmOut: ent.pmOut || ''
+                // REMOVED: generateCertificate: Boolean(ent.generateCertificate)
+            });
+        }
+      }
+
+      // If validation failed in the loop, stop submission
+      if (validationFailed) {
+          return;
+      }
+
+      if (payload.length === 0) {
+        showModal('Information', 'No valid overtime entries to submit.', 'info');
+        return;
+      }
+
+
+      const submitBtn = $('#submitBtn');
+      submitBtn.prop('disabled', true).html('<i class="bi bi-arrow-repeat animate-spin"></i> Submitting...');
+
+      google.script.run
+      .withSuccessHandler(function(res) {
+          // MODIFIED: Success message to reflect new workflow
+          const successMessage = `
+            <div class="space-y-3">
+              <p class="text-base">Successfully recorded <span class="font-bold text-green-600">${res.added}</span> overtime ${res.added === 1 ? 'entry' : 'entries'}.</p>
+              <div class="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">Total COC to be Earned:</span>
+                  <span class="text-xl font-bold text-green-600">${res.totalNewCOC.toFixed(1)}</span>
+                </div>
+              </div>
+              <p class="text-sm text-gray-600">These entries are now pending. You can generate the monthly certificate from the "Recorded Entries" table to finalize them and add them to the employee's balance.</p>
+            </div>
+          `;
+          showModal('Success', successMessage, 'success');
+          submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Submit');
+
+          entries.length = 0;
+          entryCounter = 0;
+          $('#dayEntries').empty();
+          $('#noEntriesMessage').show();
+          updateSummary();
+          updateEntryCounter();
+          validateCOCLimits();
+
+          updateEmployeeInfo(); // Refresh balance and stats after submission
+
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        })
+        .withFailureHandler(function(err) {
+          // Display the actual error message from the server
+          showModal('Error Submitting Entries', err.message || 'An unknown error occurred.', 'danger');
+          submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Submit');
+        })
+        .apiRecordCOC(employeeId, month, year, payload); // Use the filtered payload
+    }
+
+
+    function backToDashboard() {
+      // MODIFIED: This function should just close the modal.
+      // Your onOpen menu is the "dashboard".
+      if (typeof google !== "undefined" && google.script && google.script.host) {
+        google.script.host.close();
+      }
+    }
+
+    window.onload = function() {
+      loadEmployees();
+      loadYearOptions();
+      loadMonthOptions();
+      updateSelectedMonthYearDisplay(); // Initial update for titles
+
+      setTimeout(function() {
+        $('#monthSelect').select2({
+          placeholder: 'Select month',
+          width: '100%',
+          minimumResultsForSearch: -1
+        }).data('prev', $('#monthSelect').val());
+
+        $('#yearSelect').select2({
+          placeholder: 'Select year',
+          width: '100%',
+          minimumResultsForSearch: -1
+        }).data('prev', $('#yearSelect').val());
+      }, 100);
+
+      // *** MODIFIED 'change' Handler ***
+      $('#monthSelect, #yearSelect').on('change', function() {
+          updateSelectedMonthYearDisplay(); // Update titles on change
+          const empId = $('#employeeSelect').val(); // Get employee ID
+
+          if (entries.length > 0) {
+            const monthName = $('#monthSelect option:selected').text();
+            const year = $('#yearSelect').val();
+            const changedSelect = $(this);
+            const prevMonth = changedSelect.attr('id') === 'monthSelect' ? changedSelect.data('prev') : $('#monthSelect').val();
+            const prevYear = changedSelect.attr('id') === 'yearSelect' ? changedSelect.data('prev') : $('#yearSelect').val();
+  
+            showConfirmModal(
+              'Change Month/Year',
+              `Changing to <strong>${monthName} ${year}</strong> will clear all current day entries. Continue?`,
+              function() { // onYes
+                entries.length = 0;
+                entryCounter = 0;
+                $('#dayEntries').empty();
+                $('#noEntriesMessage').show();
+                updateSummary();
+                updateEntryCounter();
+                validateCOCLimits();
+                $('#monthSelect').data('prev', $('#monthSelect').val());
+                $('#yearSelect').data('prev', $('#yearSelect').val());
+                
+                loadExistingRecords(); // Reload existing records
+                if(empId) { // Load stats for new month/year
+                    loadEmployeeCOCStats(empId, parseInt($('#monthSelect').val(), 10), parseInt($('#yearSelect').val(), 10));
+                }
+              },
+              function() { // onNo
+                if (changedSelect.attr('id') === 'monthSelect') {
+                  changedSelect.val(prevMonth).trigger('change.select2');
+                } else {
+                  changedSelect.val(prevYear).trigger('change.select2');
+                }
+                updateSelectedMonthYearDisplay(); // Revert title display if cancelled
+              }
+            );
+          } else {
+            $('#monthSelect').data('prev', $('#monthSelect').val());
+            $('#yearSelect').data('prev', $('#yearSelect').val());
+            loadExistingRecords(); // Load records for the new month/year
+            if(empId) { // Load stats for new month/year
+              loadEmployeeCOCStats(empId, parseInt($('#monthSelect').val(), 10), parseInt($('#yearSelect').val(), 10));
+            }
+          }
+      });
+
+      $('#employeeSelect').on('change', updateEmployeeInfo);
+      $('#addDayBtn').on('click', addDayEntry);
+      $('#cancelBtn').on('click', function() {
+        if (typeof google !== "undefined" && google.script && google.script.host) {
+          google.script.host.close();
+        }
+      });
+      $('#submitBtn').on('click', submitEntries);
+      $('#backToDashboardBtn').on('click', backToDashboard);
+      $('#refreshExistingBtn').on('click', loadExistingRecords);
+      $('#generateMonthlyCertBtn').on('click', generateMonthlyCertificate); // MODIFIED: Listener now calls modal
+      
+      // REMOVED: Settings Button Listener
+
+      $('#closeModalBtn, #modalOkBtn').on('click', closeModal);
+      $('#closeConfirmModalBtn').on('click', closeConfirmModal);
+      $('#modalBackdrop').on('click', closeModal);
+      $('#confirmModalBackdrop').on('click', closeConfirmModal);
+
+      // NEW: Listeners for Issue Date Modal
+      $('#closeIssueDateModalBtn, #issueDateCancelBtn').on('click', closeIssueDateModal);
+      $('#issueDateConfirmBtn').on('click', confirmCertificateGeneration);
+      $('#issueDateModalBackdrop').on('click', closeIssueDateModal);
+
+    };
+
+  </script>
+
+</body>
+</html>
+
+
+
