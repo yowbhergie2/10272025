@@ -429,7 +429,6 @@
             <th class="px-3 py-2 text-left">Date</th>
             <th class="px-3 py-2 text-left">Day Type</th>
             <th class="px-3 py-2 text-right">COC Earned</th>
-            <th class="px-3 py-2 text-left">Monthly Certificate</th>
             <th class="px-3 py-2 text-center">Actions</th>
           </tr>
         </thead>
@@ -438,6 +437,37 @@
     </div>
 
     <div id="existingRecordsEmpty" class="text-sm text-gray-500 text-center py-6">Select an employee and month to view recorded entries.</div>
+  </div>
+
+  <!-- Monthly Certificate Section -->
+  <div class="card" id="monthlyCertificateSection" style="display: none;">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-800">
+        <i class="bi bi-award text-indigo-600"></i> Monthly Certificate
+      </h3>
+    </div>
+
+    <div id="monthlyCertificateContent" class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <div id="noCertificate" class="text-center text-gray-500 text-sm py-4">
+        <i class="bi bi-info-circle"></i> No certificate generated for this month yet.
+      </div>
+      <div id="certificateInfo" style="display: none;" class="flex items-center justify-between">
+        <div class="flex-1">
+          <p class="text-sm font-medium text-gray-700 mb-1">Certificate ID: <span id="certIdDisplay" class="text-indigo-600"></span></p>
+          <p class="text-sm text-gray-600">Total COC Earned: <span id="certTotalDisplay" class="font-semibold"></span> hours</p>
+          <p class="text-sm text-gray-600">Issued: <span id="certIssuedDisplay"></span></p>
+          <p class="text-sm text-gray-600">Valid Until: <span id="certExpiryDisplay"></span></p>
+        </div>
+        <div class="flex flex-col gap-2">
+          <a id="certViewLink" href="#" target="_blank" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 text-center">
+            <i class="bi bi-file-earmark-text"></i> View Certificate
+          </a>
+          <a id="certPdfLink" href="#" target="_blank" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 text-center" download>
+            <i class="bi bi-file-earmark-pdf"></i> Download PDF
+          </a>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="flex gap-3 justify-end">
@@ -686,6 +716,21 @@
           message: `${monthNames[month - 1]} ${year} only has ${maxDays} days. Day ${day} is invalid.`
         };
       }
+
+      // NEW: Check against existing database records
+      if (existingRecordDates.includes(day)) {
+        return {
+          valid: false,
+          message: `<strong>${monthNames[month - 1]} ${day}, ${year}</strong> already has a COC record in the database.<br><br>` +
+                   `<div class="bg-blue-50 border-l-4 border-blue-400 p-3 mt-2">` +
+                   `<i class="bi bi-info-circle text-blue-600"></i> ` +
+                   `<strong>To update this record:</strong> Go to "Recorded Entries & Certificates" section below, ` +
+                   `then click the <span class="text-blue-600 font-semibold">Edit</span> button for that date.` +
+                   `</div>`,
+          isDatabaseDuplicate: true
+        };
+      }
+
       return { valid: true };
     }
 
@@ -1370,6 +1415,9 @@ window.cancelDuplicate = function() {
       status.html(message);
     }
 
+    // Store existing dates for duplicate check
+    let existingRecordDates = [];
+
     function loadExistingRecords() {
       resetStatus();
       const employeeId = $('#employeeSelect').val();
@@ -1378,9 +1426,11 @@ window.cancelDuplicate = function() {
       const body = $('#existingRecordsBody');
       body.empty();
       $('#generateMonthlyCertBtn').addClass('hidden'); // Hide button by default
+      $('#monthlyCertificateSection').hide(); // Hide certificate section by default
 
       if (!employeeId || !month || !year) {
         $('#existingRecordsEmpty').removeClass('hidden').text('Select an employee and month to view recorded entries.');
+        existingRecordDates = [];
         return;
       }
 
@@ -1390,8 +1440,11 @@ window.cancelDuplicate = function() {
       google.script.run
         .withSuccessHandler(function(records) {
           body.empty();
+          existingRecordDates = []; // Reset
+
           if (!records || records.length === 0) {
             $('#existingRecordsEmpty').removeClass('hidden').text('No entries recorded for this month yet.');
+            loadMonthlyCertificate(employeeId, month, year); // Still check for certificate
             return;
           }
 
@@ -1402,17 +1455,8 @@ window.cancelDuplicate = function() {
           }
 
           records.forEach(record => {
-            // Certificate cell logic
-            const certificateCell = record.certificateUrl
-              ? `<div class="flex flex-col gap-1">
-                   <a href="${record.certificateUrl}" target="_blank" class="text-indigo-600 hover:underline text-xs">
-                     <i class="bi bi-file-earmark-text"></i> View Cert
-                   </a>
-                   <a href="${record.pdfUrl}" target="_blank" class="text-green-600 hover:underline text-xs" download>
-                     <i class="bi bi-file-earmark-pdf"></i> Download PDF
-                   </a>
-                 </div>`
-              : '<span class="badge badge-amber"><i class="bi bi-hourglass-split"></i> Awaiting Certificate</span>';
+            // Store existing dates for duplicate validation
+            existingRecordDates.push(new Date(record.displayDate).getDate());
 
             // Actions cell - only show for pending records (not yet certificated)
             const actionsCell = !record.certificateUrl
@@ -1424,16 +1468,15 @@ window.cancelDuplicate = function() {
                      <i class="bi bi-trash"></i> Delete
                    </button>
                  </div>`
-              : '<span class="text-xs text-gray-400">Certificated</span>';
+              : '<span class="text-xs text-gray-400 italic">Certificated</span>';
 
-            // Row template
+            // Row template (removed certificate column)
             const row = $(`
               <tr>
                 <td class="px-3 py-2">${record.displayDate}</td>
                 <td class="px-3 py-2">${record.dayType || ''}</td>
                 <td class="px-3 py-2 text-right">${Number(record.cocEarned || 0).toFixed(2)}</td>
-                <td class="px-3 py-2">${certificateCell}</td>
-                <td class="px-3 py-2">${actionsCell}</td>
+                <td class="px-3 py-2 text-center">${actionsCell}</td>
               </tr>
             `);
 
@@ -1448,6 +1491,9 @@ window.cancelDuplicate = function() {
 
             body.append(row);
           });
+
+          // Load monthly certificate info
+          loadMonthlyCertificate(employeeId, month, year);
         })
         .withFailureHandler(function(error) {
           body.empty();
@@ -1455,6 +1501,37 @@ window.cancelDuplicate = function() {
           showStatus(error && error.message ? error.message : String(error), 'error');
         })
         .apiListCOCRecordsForMonth(employeeId, month, year);
+    }
+
+    // NEW: Load monthly certificate information
+    function loadMonthlyCertificate(employeeId, month, year) {
+      google.script.run
+        .withSuccessHandler(function(certificate) {
+          if (certificate && certificate.certificateId) {
+            // Show certificate section
+            $('#monthlyCertificateSection').show();
+            $('#noCertificate').hide();
+            $('#certificateInfo').show();
+
+            // Populate certificate details
+            $('#certIdDisplay').text(certificate.certificateId);
+            $('#certTotalDisplay').text(certificate.totalCOC.toFixed(2));
+            $('#certIssuedDisplay').text(certificate.issueDate || 'N/A');
+            $('#certExpiryDisplay').text(certificate.expirationDate || 'N/A');
+            $('#certViewLink').attr('href', certificate.certificateUrl);
+            $('#certPdfLink').attr('href', certificate.pdfUrl || certificate.certificateUrl);
+          } else {
+            // No certificate yet
+            $('#monthlyCertificateSection').show();
+            $('#noCertificate').show();
+            $('#certificateInfo').hide();
+          }
+        })
+        .withFailureHandler(function(error) {
+          // Hide certificate section on error
+          $('#monthlyCertificateSection').hide();
+        })
+        .apiGetMonthlyCertificate(employeeId, month, year);
     }
 
     // REMOVED: generateCertificate(recordId, button) function

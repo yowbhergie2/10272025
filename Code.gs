@@ -124,6 +124,8 @@ const TR_TYPE_ADJUSTED = 'Adjusted';
  * This is needed because older records were created without the MONTH_YEAR column,
  * and the new apiListCOCRecordsForMonth function filters by this column.
  *
+ * IMPORTANT: Sets the column format to PLAIN TEXT to prevent auto-conversion to dates!
+ *
  * Run this function once to migrate old data.
  */
 function migrateCOCRecordsMonthYear() {
@@ -136,8 +138,22 @@ function migrateCOCRecordsMonthYear() {
       return { success: false, message: 'COC_Records sheet not found' };
     }
 
+    // CRITICAL FIX: Set the MONTH_YEAR column (Column D) to PLAIN TEXT format
+    // This prevents Google Sheets from auto-converting "2025-10" to a Date object
+    const monthYearColumnIndex = RECORD_COLS.MONTH_YEAR + 1; // Convert to 1-based
+    const lastRow = recordsSheet.getLastRow();
+
+    if (lastRow > 1) {
+      const monthYearRange = recordsSheet.getRange(2, monthYearColumnIndex, lastRow - 1, 1);
+      monthYearRange.setNumberFormat('@STRING@'); // Force plain text format
+      Logger.log(`Set column ${monthYearColumnIndex} (MONTH_YEAR) to PLAIN TEXT format for rows 2-${lastRow}`);
+    }
+
     const data = recordsSheet.getDataRange().getValues();
     let updatedCount = 0;
+    let fixedCount = 0;
+
+    Logger.log(`Starting migration. Total rows: ${data.length}`);
 
     // Start from row 2 (index 1) to skip header
     for (let i = 1; i < data.length; i++) {
@@ -145,27 +161,141 @@ function migrateCOCRecordsMonthYear() {
       const monthYearValue = row[RECORD_COLS.MONTH_YEAR];
       const dateRendered = row[RECORD_COLS.DATE_RENDERED];
 
-      // If MONTH_YEAR is empty and we have a DATE_RENDERED, populate it
+      let needsUpdate = false;
+      let newMonthYear = null;
+
+      // Case 1: MONTH_YEAR is empty
       if (!monthYearValue && dateRendered) {
         const date = new Date(dateRendered);
         if (!isNaN(date.getTime())) {
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, '0');
-          const monthYear = `${year}-${month}`;
-
-          // Update the MONTH_YEAR column (column D, which is column 4, index 3+1)
-          recordsSheet.getRange(i + 1, RECORD_COLS.MONTH_YEAR + 1).setValue(monthYear);
-          updatedCount++;
+          newMonthYear = `${year}-${month}`;
+          needsUpdate = true;
+          Logger.log(`Row ${i + 1}: EMPTY - Set to ${newMonthYear} from date ${date}`);
         }
+      }
+      // Case 2: MONTH_YEAR is a Date object (should be a string)
+      else if (monthYearValue instanceof Date) {
+        const date = new Date(monthYearValue);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          newMonthYear = `${year}-${month}`;
+          needsUpdate = true;
+          fixedCount++;
+          Logger.log(`Row ${i + 1}: DATE OBJECT - Convert to ${newMonthYear}`);
+        }
+      }
+      // Case 3: MONTH_YEAR is in wrong format (MM-YYYY instead of YYYY-MM)
+      else if (typeof monthYearValue === 'string') {
+        const trimmed = monthYearValue.trim();
+        // Check if it matches MM-YYYY format (e.g., "10-2025")
+        const mmYyyyMatch = trimmed.match(/^(\d{2})-(\d{4})$/);
+        if (mmYyyyMatch) {
+          const month = mmYyyyMatch[1];
+          const year = mmYyyyMatch[2];
+          newMonthYear = `${year}-${month}`;
+          needsUpdate = true;
+          fixedCount++;
+          Logger.log(`Row ${i + 1}: WRONG FORMAT "${trimmed}" - Fix to ${newMonthYear}`);
+        }
+        // If it's already in YYYY-MM format, skip
+        else if (trimmed.match(/^\d{4}-\d{2}$/)) {
+          Logger.log(`Row ${i + 1}: Already correct format: ${trimmed}`);
+        }
+        // Unknown format - try to fix from date
+        else if (dateRendered) {
+          const date = new Date(dateRendered);
+          if (!isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            newMonthYear = `${year}-${month}`;
+            needsUpdate = true;
+            fixedCount++;
+            Logger.log(`Row ${i + 1}: UNKNOWN FORMAT "${trimmed}" - Fix to ${newMonthYear} from date`);
+          }
+        }
+      }
+
+      // Update the cell if needed
+      if (needsUpdate && newMonthYear) {
+        // Set as plain text with single quote prefix to FORCE text format
+        recordsSheet.getRange(i + 1, monthYearColumnIndex).setValue("'" + newMonthYear);
+        updatedCount++;
       }
     }
 
-    Logger.log(`Migration completed. Updated ${updatedCount} records.`);
-    return { success: true, updatedCount: updatedCount };
+    Logger.log(`Migration completed. Updated ${updatedCount} records (${fixedCount} were format fixes).`);
+    return {
+      success: true,
+      updatedCount: updatedCount,
+      fixedCount: fixedCount
+    };
 
   } catch (e) {
     Logger.log(`Error in migrateCOCRecordsMonthYear: ${e}`);
     return { success: false, message: e.message };
+  }
+}
+
+/**
+ * DEBUG FUNCTION: Check what data exists for a specific employee and month
+ * This helps diagnose why records aren't showing
+ */
+function debugCOCRecords(employeeId, month, year) {
+  try {
+    const db = SpreadsheetApp.openById(DATABASE_ID);
+    const recordsSheet = db.getSheetByName('COC_Records');
+    const data = recordsSheet.getDataRange().getValues();
+
+    const monthYear = `${year}-${String(month).padStart(2, '0')}`;
+
+    Logger.log('=== DEBUG COC RECORDS ===');
+    Logger.log(`Looking for: Employee ID = "${employeeId}", Month/Year = "${monthYear}"`);
+    Logger.log(`Total rows in sheet: ${data.length}`);
+    Logger.log('');
+
+    // Check header
+    Logger.log('Headers:');
+    Logger.log(data[0]);
+    Logger.log('');
+
+    let matchingRecords = 0;
+    let recordsForEmployee = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rowEmpId = row[RECORD_COLS.EMPLOYEE_ID];
+      const rowMonthYear = row[RECORD_COLS.MONTH_YEAR];
+      const rowStatus = row[RECORD_COLS.STATUS];
+      const rowDate = row[RECORD_COLS.DATE_RENDERED];
+
+      // Count all records for this employee
+      if (rowEmpId === employeeId) {
+        recordsForEmployee++;
+        Logger.log(`Row ${i + 1}: EmpID="${rowEmpId}", MonthYear="${rowMonthYear}", Status="${rowStatus}", Date="${rowDate}"`);
+
+        // Check if it matches our filter
+        if (rowMonthYear === monthYear) {
+          matchingRecords++;
+          Logger.log(`  ^^^ MATCHES! ^^^`);
+        }
+      }
+    }
+
+    Logger.log('');
+    Logger.log(`Summary: Found ${recordsForEmployee} total records for employee ${employeeId}`);
+    Logger.log(`Found ${matchingRecords} records matching month/year ${monthYear}`);
+
+    return {
+      totalRecordsForEmployee: recordsForEmployee,
+      matchingRecords: matchingRecords
+    };
+
+  } catch (e) {
+    Logger.log(`Error in debugCOCRecords: ${e}`);
+    return { error: e.message };
   }
 }
 
@@ -3243,7 +3373,8 @@ function onOpen() {
     .addItem('Reports', 'showReports')
     .addSeparator()
     .addSubMenu(ui.createMenu('Admin Tools')
-      .addItem('Run Data Migration (MONTH_YEAR)', 'runCOCRecordsMigration'))
+      .addItem('Run Data Migration (MONTH_YEAR)', 'runCOCRecordsMigration')
+      .addItem('Debug COC Records', 'debugMariaOctober2025'))
     .addToUi();
 }
 
@@ -3262,12 +3393,49 @@ function runCOCRecordsMigration() {
     try {
       const result = migrateCOCRecordsMonthYear();
       if (result.success) {
-        ui.alert('Migration Complete', `Successfully updated ${result.updatedCount} records.`, ui.ButtonSet.OK);
+        const message = `Successfully updated ${result.updatedCount} records.\n` +
+          `Format fixes: ${result.fixedCount || 0}\n\n` +
+          `Please refresh the page and try viewing records again.\n\n` +
+          `Check the Execution log (View > Execution log) for details.`;
+        ui.alert('Migration Complete', message, ui.ButtonSet.OK);
       } else {
         ui.alert('Migration Failed', result.message || 'An unknown error occurred.', ui.ButtonSet.OK);
       }
     } catch (e) {
       ui.alert('Migration Error', e.message || String(e), ui.ButtonSet.OK);
+    }
+  }
+}
+
+/**
+ * Menu function to debug COC records for Maria L Garcia in October 2025
+ * This helps diagnose the "No entries recorded" issue
+ */
+function debugMariaOctober2025() {
+  const ui = SpreadsheetApp.getUi();
+
+  // Get Maria's employee ID - you may need to adjust this
+  const employeeId = ui.prompt(
+    'Enter Employee ID',
+    'Enter the Employee ID to debug (e.g., EMP001):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (employeeId.getSelectedButton() === ui.Button.OK) {
+    const empId = employeeId.getResponseText();
+
+    try {
+      // Run debug function
+      const result = debugCOCRecords(empId, 10, 2025);
+
+      const message = `Debug Results:\n\n` +
+        `Total records for ${empId}: ${result.totalRecordsForEmployee}\n` +
+        `Matching October 2025: ${result.matchingRecords}\n\n` +
+        `Check the Execution log (View > Execution log) for detailed information.`;
+
+      ui.alert('Debug Complete', message, ui.ButtonSet.OK);
+    } catch (e) {
+      ui.alert('Debug Error', e.message || String(e), ui.ButtonSet.OK);
     }
   }
 }
@@ -6449,7 +6617,8 @@ function testFIFOIntegrityCheck() {
  */
 
 // !!! IMPORTANT: REPLACE 'YOUR_TEMPLATE_ID_HERE' WITH YOUR ACTUAL GOOGLE DOC TEMPLATE ID
-const COC_CERTIFICATE_TEMPLATE_ID = 'YOUR_TEMPLATE_ID_HERE'; 
+// *** REMOVED: Hardcoded template ID - now stored in Settings sheet ***
+// const COC_CERTIFICATE_TEMPLATE_ID = 'YOUR_TEMPLATE_ID_HERE'; 
 
 // -----------------------------------------------------------------------------
 // API: List & Record COC Entries
@@ -6461,11 +6630,14 @@ const COC_CERTIFICATE_TEMPLATE_ID = 'YOUR_TEMPLATE_ID_HERE';
  */
 function apiListCOCRecordsForMonth(employeeId, month, year) {
   if (!employeeId || !month || !year) throw new Error("Employee ID, month, and year are required.");
-  
+
   try {
     const monthYear = `${year}-${String(month).padStart(2, '0')}`;
     const recordsData = getSheetDataNoHeader('COC_Records');
     const certsData = getSheetDataNoHeader('COC_Certificates');
+
+    Logger.log(`apiListCOCRecordsForMonth: Searching for empId="${employeeId}", month=${month}, year=${year}, monthYear="${monthYear}"`);
+    Logger.log(`Total records in sheet: ${recordsData.length}`);
 
     // Create a map of Certificate IDs to their URLs for easy lookup
     const certMap = new Map();
@@ -6476,10 +6648,24 @@ function apiListCOCRecordsForMonth(employeeId, month, year) {
       });
     });
 
-    const employeeMonthRecords = recordsData.filter(r => 
-      r[RECORD_COLS.EMPLOYEE_ID] === employeeId && 
-      r[RECORD_COLS.MONTH_YEAR] === monthYear
-    );
+    // Filter records - EXCLUDE CANCELLED status
+    const employeeMonthRecords = recordsData.filter(r => {
+      const rowEmpId = String(r[RECORD_COLS.EMPLOYEE_ID] || '').trim();
+      const rowMonthYear = String(r[RECORD_COLS.MONTH_YEAR] || '').trim();
+      const rowStatus = String(r[RECORD_COLS.STATUS] || '').trim();
+
+      const empMatch = rowEmpId === employeeId;
+      const monthMatch = rowMonthYear === monthYear;
+      const notCancelled = rowStatus !== STATUS_CANCELLED;
+
+      if (empMatch) {
+        Logger.log(`  Row: empId="${rowEmpId}", monthYear="${rowMonthYear}", status="${rowStatus}", matches=${empMatch && monthMatch && notCancelled}`);
+      }
+
+      return empMatch && monthMatch && notCancelled;
+    });
+
+    Logger.log(`Found ${employeeMonthRecords.length} matching records`);
 
     // Format the records for the client
     const formattedRecords = employeeMonthRecords.map(r => {
@@ -6756,10 +6942,15 @@ function apiGenerateMonthlyCOCCertificate(employeeId, month, year, issueDateStri
  */
 function generateCertificateDocument(certificateId, empDetails, records, issueDate, expirationDate) {
   try {
-    const templateId = COC_CERTIFICATE_TEMPLATE_ID;
-    if (templateId === '114b0thKcB-TCO6Zc53e5OgNpWNI5WGWbf2aNDmZjlNE') {
-      throw new Error("Invalid Certificate Template ID. Please update COC_CERTIFICATE_TEMPLATE_ID in Code.gs.");
+    // Get template ID from Settings sheet
+    const settings = getSheetDataNoHeader('Settings');
+    const templateRow = settings.find(r => r[0] === 'COC_CERTIFICATE_TEMPLATE_ID');
+    const templateId = templateRow ? templateRow[1] : null;
+
+    if (!templateId || templateId === 'YOUR_TEMPLATE_ID_HERE' || !templateId.trim()) {
+      throw new Error("Certificate Template ID not configured. Please set COC_CERTIFICATE_TEMPLATE_ID in the Settings sheet.");
     }
+
     const templateFile = DriveApp.getFileById(templateId);
     
     // Create a copy
@@ -6969,6 +7160,53 @@ function apiSaveSignatories(signatories) {
     throw new Error(`Failed to save signatories: ${e.message}`);
   } finally {
     lock.releaseLock();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// API: Get Monthly Certificate
+// -----------------------------------------------------------------------------
+
+/**
+ * Gets the monthly certificate information for display.
+ * Returns null if no certificate exists for the month.
+ *
+ * @param {string} employeeId - The employee ID
+ * @param {number} month - Month (1-12)
+ * @param {number} year - Year (e.g., 2025)
+ * @returns {Object|null} Certificate object or null
+ */
+function apiGetMonthlyCertificate(employeeId, month, year) {
+  if (!employeeId || !month || !year) return null;
+
+  try {
+    const monthYear = `${year}-${String(month).padStart(2, '0')}`;
+    const certsData = getSheetDataNoHeader('COC_Certificates');
+
+    // Find certificate for this employee and month
+    const cert = certsData.find(c =>
+      c[CERT_COLS.EMPLOYEE_ID] === employeeId &&
+      c[CERT_COLS.MONTH_YEAR] === monthYear
+    );
+
+    if (!cert) return null;
+
+    return {
+      certificateId: cert[CERT_COLS.CERTIFICATE_ID],
+      totalCOC: parseFloat(cert[CERT_COLS.TOTAL_COC_EARNED] || 0),
+      numRecords: cert[CERT_COLS.NUMBER_OF_RECORDS],
+      issueDate: cert[CERT_COLS.ISSUE_DATE] ?
+        Utilities.formatDate(new Date(cert[CERT_COLS.ISSUE_DATE]), "GMT+8", "MMM dd, yyyy") : null,
+      expirationDate: cert[CERT_COLS.EXPIRATION_DATE] ?
+        Utilities.formatDate(new Date(cert[CERT_COLS.EXPIRATION_DATE]), "GMT+8", "MMM dd, yyyy") : null,
+      certificateUrl: cert[CERT_COLS.CERTIFICATE_URL],
+      pdfUrl: cert[CERT_COLS.PDF_URL],
+      status: cert[CERT_COLS.STATUS]
+    };
+
+  } catch (e) {
+    Logger.log(`Error in apiGetMonthlyCertificate: ${e}`);
+    return null;
   }
 }
 
