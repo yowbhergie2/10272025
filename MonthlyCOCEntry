@@ -249,6 +249,32 @@
     .status-box {
       border-radius: 0.75rem;
     }
+
+    /* --- Added Spinner for PDF generation --- */
+    .spinner-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 70; /* Higher than other modals */
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 2rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      text-align: center;
+    }
+    .spinner-backdrop {
+       display: none;
+       position: fixed;
+       top: 0;
+       left: 0;
+       right: 0;
+       bottom: 0;
+       background-color: rgba(0, 0, 0, 0.25);
+       z-index: 69; /* Below spinner, above other modals */
+    }
+    /* --- End Spinner Style --- */
   </style>
 </head>
 <body>
@@ -259,7 +285,6 @@
       <h4 class="text-2xl font-semibold text-gray-800">
         <i class="bi bi-calendar-plus"></i> Monthly COC Entry
       </h4>
-      <!-- MODIFIED: Removed the Settings Button -->
       <div class="flex gap-2">
         <button type="button" class="px-4 py-2 bg-gray-600 text-white font-medium rounded-md shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors" id="backToDashboardBtn">
           <i class="bi bi-arrow-left-circle"></i> Back to Dashboard
@@ -282,25 +307,18 @@
         <p class="mt-1 text-xs text-gray-500">
           <i class="bi bi-search"></i> Start typing employee name, position, or office to search
         </p>
-         <!-- *** COC Stats Display MOVED to the next section *** -->
       </div>
-      <!-- *** MODIFIED Balance Card *** -->
       <div id="balanceCard" class="p-5 rounded-lg text-white bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg text-center">
         <div class="text-sm font-medium opacity-90">Current COC Balance</div>
         <div class="text-4xl font-bold my-1">
-          <span id="balanceValue">0.0</span> / 120 hrs <!-- Added / 120 hrs -->
+          <span id="balanceValue">0.0</span> / 120 hrs
         </div>
-        <div class="text-xs opacity-75 mb-2">Available: <span id="balanceAvailable">120.0</span> hrs</div> <!-- Added Available line -->
-        <!-- Removed employeeInfo div -->
+        <div class="text-xs opacity-75 mb-2">Available: <span id="balanceAvailable">120.0</span> hrs</div>
       </div>
-      <!-- *** END MODIFIED Balance Card *** -->
     </div>
   </div>
 
-  <!-- *** MODIFIED SECTION: New Parent Grid for Month/Year and Stats *** -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
-    
-    <!-- Card 1: Select Month & Year (spanning 2 cols) -->
     <div class="bg-white p-5 rounded-xl shadow-md lg:col-span-2">
       <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
         <i class="bi bi-calendar3 text-blue-600"></i> Select Month & Year for Entry
@@ -321,12 +339,10 @@
       </div>
     </div>
 
-    <!-- Card 2: This Month Balance (spanning 1 col) -->
     <div id="cocStatsDisplay" class="hidden bg-white p-5 rounded-xl shadow-md">
       <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
           <i class="bi bi-graph-up text-blue-600"></i> <span class="uppercase">Stats for Selected Month</span>
       </div>
-      <!-- MODIFIED: Changed space-y-3 to grid grid-cols-2 to place stats side-by-side -->
       <div class="grid grid-cols-2 gap-4">
           <div class="text-sm">
               <div class="text-gray-600">This Month's Earned</div>
@@ -334,7 +350,7 @@
                 <span id="currentMonthTotal">0.0</span> / 40 hrs
               </div>
           </div>
-          <div class="text-sm"> <!-- REMOVED mt-3 -->
+          <div class="text-sm">
               <div class="text-gray-600">Can still earn:</div>
               <div class="font-bold text-green-600 text-2xl">
                   <span id="monthlyRemaining">40.0</span> hrs
@@ -342,9 +358,7 @@
           </div>
       </div>
     </div>
-
-  </div> 
-  <!-- *** END OF MODIFIED SECTION *** -->
+  </div>
 
   <div id="validationWarning" class="hidden bg-red-50 border-l-4 border-red-500 p-4 mb-5 rounded-lg">
     <div class="flex">
@@ -356,13 +370,10 @@
     </div>
   </div>
 
-  <!-- *** REMOVED DUPLICATE SECTION *** -->
-  <!-- The duplicate grid and empty "Select Month & Year" card that were here have been removed. -->
-
   <div class="bg-white p-5 rounded-xl shadow-md mb-5">
     <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200 flex items-center justify-between">
       <div>
-        <i class="bi bi-clock text-blue-600"></i> Overtime Days for <span id="selectedMonthYearDisplay" class="font-bold">Selected Month</span> <!-- Added display for selected month -->
+        <i class="bi bi-clock text-blue-600"></i> Overtime Days for <span id="selectedMonthYearDisplay" class="font-bold">Selected Month</span>
       </div>
       <div class="text-sm font-normal text-gray-600">
         <span id="entryCounter">0 entries</span>
@@ -383,7 +394,7 @@
 
   <div class="bg-white p-5 rounded-xl shadow-md mb-5">
     <div class="text-lg font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
-      <i class="bi bi-calculator text-blue-600"></i> Summary for <span id="summaryMonthYearDisplay" class="font-bold">Selected Month</span> <!-- Added display for selected month -->
+      <i class="bi bi-calculator text-blue-600"></i> Summary for <span id="summaryMonthYearDisplay" class="font-bold">Selected Month</span>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-center">
       <div class="p-4 bg-blue-50 rounded-lg">
@@ -401,19 +412,29 @@
     </div>
   </div>
 
+  <!-- *** MOVED BUTTONS *** -->
+  <div class="flex gap-3 justify-end mb-5"> <!-- Added mb-5 for spacing -->
+    <button type="button" id="cancelBtn" class="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
+      <i class="bi bi-x-circle"></i> Cancel
+    </button>
+    <button type="button" id="submitBtn" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+      <i class="bi bi-check-circle"></i> Submit Entries
+    </button>
+  </div>
+  <!-- *** END MOVED BUTTONS *** -->
+
   <div class="bg-white p-5 rounded-xl shadow-md mb-5">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
       <div class="text-lg font-semibold text-gray-800 flex items-center gap-2">
         <i class="bi bi-journal-check text-purple-600"></i>
-        Recorded Entries & Certificates for <span id="existingMonthYearDisplay" class="font-bold">Selected Month</span> <!-- Added display for selected month -->
+        Recorded Entries & Certificates for <span id="existingMonthYearDisplay" class="font-bold">Selected Month</span>
       </div>
-      <!-- MODIFIED: Added Generate Monthly Certificate Button -->
       <div class="flex gap-3">
         <button type="button" id="refreshExistingBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 text-white text-sm font-medium rounded-lg shadow hover:bg-gray-600 transition-colors">
           <i class="bi bi-arrow-clockwise"></i>
           Refresh
         </button>
-        <button type="button" id="generateMonthlyCertBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow hover:bg-indigo-700 transition-colors hidden">
+        <button type="button" id="generateMonthlyCertBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow hover:bg-indigo-700 transition-colors hidden disabled:opacity-50" disabled>
           <i class="bi bi-file-earmark-plus"></i>
           Generate Monthly Certificate
         </button>
@@ -440,8 +461,8 @@
   </div>
 
   <!-- Monthly Certificate Section -->
-  <div class="card" id="monthlyCertificateSection" style="display: none;">
-    <div class="flex items-center justify-between mb-4">
+  <div class="bg-white p-5 rounded-xl shadow-md mb-5" id="monthlyCertificateSection" style="display: none;"> <!-- Added bg, p, rounded, shadow, mb -->
+    <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200"> <!-- Added styles -->
       <h3 class="text-lg font-semibold text-gray-800">
         <i class="bi bi-award text-indigo-600"></i> Monthly Certificate
       </h3>
@@ -462,7 +483,7 @@
           <a id="certViewLink" href="#" target="_blank" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 text-center">
             <i class="bi bi-file-earmark-text"></i> View Certificate
           </a>
-          <a id="certPdfLink" href="#" target="_blank" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 text-center" download>
+          <a id="certPdfLink" href="#" target="_blank" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 text-center" download> <!-- Removed download attribute temporarily -->
             <i class="bi bi-file-earmark-pdf"></i> Download PDF
           </a>
         </div>
@@ -470,15 +491,7 @@
     </div>
   </div>
 
-  <div class="flex gap-3 justify-end">
-    <button type="button" id="cancelBtn" class="px-6 py-3 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
-      <i class="bi bi-x-circle"></i> Cancel
-    </button>
-    <button type="button" id="submitBtn" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
-      <i class="bi bi-check-circle"></i> Submit
-    </button>
-  </div>
-
+  <!-- Modals (Information, Confirm, Issue Date, Delete Record) remain the same -->
   <div class="modal-backdrop" id="modalBackdrop"></div>
   <div class="modal" id="infoModal">
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -522,7 +535,6 @@
     </div>
   </div>
 
-  <!-- NEW: Issue Date Modal -->
   <div class="modal-backdrop" id="issueDateModalBackdrop"></div>
   <div class="modal" id="issueDateModal">
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -553,7 +565,6 @@
     </div>
   </div>
 
-  <!-- NEW: Delete Record Modal -->
   <div class="modal-backdrop" id="deleteRecordModalBackdrop"></div>
   <div class="modal" id="deleteRecordModal">
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -586,14 +597,36 @@
     </div>
   </div>
 
+  <!-- PDF Generation Spinner -->
+  <div id="spinnerBackdrop" class="spinner-backdrop"></div>
+  <div id="spinnerModal" class="spinner-modal">
+      <div class="flex items-center justify-center">
+          <div class="text-4xl text-indigo-600 animate-spin">
+              <i class="bi bi-arrow-repeat"></i>
+          </div>
+          <div class="ml-4 text-lg font-medium text-gray-700">Generating Certificate...</div>
+      </div>
+  </div>
+  <!-- END: Spinner Modal -->
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0/js/select2.min.js"></script>
   <script>
+    // --- Added Spinner Functions ---
+    function showPdfSpinner() {
+      $('#spinnerBackdrop, #spinnerModal').addClass('show');
+    }
+    function hidePdfSpinner() {
+      $('#spinnerBackdrop, #spinnerModal').removeClass('show');
+    }
+    // --- End Spinner Functions ---
+
     let entries = [];
     let entryCounter = 0;
     let currentEmployeeStats = null;
     let currentRecordToDelete = null;
 
+    // --- Modal functions (showModal, closeModal, showConfirmModal, closeConfirmModal, etc.) remain unchanged ---
     function showModal(title, body, type) {
       $('#modalTitle').text(title);
       $('#modalBody').html(body);
@@ -625,7 +658,7 @@
         if (onYes) onYes();
       });
 
-      $('#confirmNoBtn').off('click').on('click', function() {
+      $('#confirmNoBtn, #closeConfirmModalBtn').off('click').on('click', function() { // Added closeConfirmModalBtn listener
         closeConfirmModal();
         if (onNo) onNo();
       });
@@ -635,9 +668,8 @@
       $('#confirmModalBackdrop, #confirmModal').removeClass('show');
     }
 
-    // NEW: Show/Hide Issue Date Modal
+    // --- Issue Date Modal functions remain unchanged ---
     function showIssueDateModal() {
-      // Set default date to today
       const today = new Date().toISOString().split('T')[0];
       $('#issueDateInput').val(today);
       $('#issueDateError').addClass('hidden');
@@ -646,11 +678,10 @@
 
     function closeIssueDateModal() {
       $('#issueDateModalBackdrop, #issueDateModal').removeClass('show');
-      // Re-enable generate button in case it was disabled
       $('#generateMonthlyCertBtn').prop('disabled', false).html('<i class="bi bi-file-earmark-plus"></i> Generate Monthly Certificate');
     }
 
-    // NEW: Delete Record Modal Functions
+    // --- Delete Record Modal functions remain unchanged ---
     function showDeleteRecordModal(recordId, recordDetails) {
       currentRecordToDelete = recordId;
       $('#deleteRecordDetails').html(`
@@ -691,8 +722,8 @@
           showModal('Success', 'COC record has been deleted successfully.', 'success');
           btn.prop('disabled', false).html('Delete Record');
           closeDeleteRecordModal();
-          loadExistingRecords(); // Refresh the table
-          updateEmployeeInfo(); // Refresh balance/stats
+          loadExistingRecords();
+          updateEmployeeInfo();
         })
         .withFailureHandler(function(error) {
           showModal('Error', error && error.message ? error.message : String(error), 'danger');
@@ -701,6 +732,7 @@
         .apiDeleteCOCRecord(recordId, reason);
     }
 
+    // --- Helper functions (getDaysInMonth, validateDayNumber, checkDuplicateDay, showDuplicateModal, updateEntryCounter, loadEmployees, loadEmployeeCOCStats, updateEmployeeInfo, validateCOCLimits, loadMonthOptions, loadYearOptions, updateSelectedMonthYearDisplay) remain unchanged ---
     function getDaysInMonth(month, year) {
       return new Date(year, month, 0).getDate();
     }
@@ -717,16 +749,14 @@
         };
       }
 
-      // NEW: Check against existing database records
+      // Check against existing database records
       if (existingRecordDates.includes(day)) {
         return {
           valid: false,
           message: `<strong>${monthNames[month - 1]} ${day}, ${year}</strong> already has a COC record in the database.<br><br>` +
                    `<div class="bg-blue-50 border-l-4 border-blue-400 p-3 mt-2">` +
                    `<i class="bi bi-info-circle text-blue-600"></i> ` +
-                   `<strong>To update this record:</strong> Go to "Recorded Entries & Certificates" section below, ` +
-                   `then click the <span class="text-blue-600 font-semibold">Edit</span> button for that date.` +
-                   `</div>`,
+                   `<strong>To update this record:</strong> Please delete this entry first. Future updates will allow editing.</div>`,
           isDatabaseDuplicate: true
         };
       }
@@ -784,7 +814,7 @@
         onConfirm();
       };
 
-window.cancelDuplicate = function() {
+      window.cancelDuplicate = function() {
         if (typeof onCancel === 'function') {
           onCancel();
         }
@@ -794,7 +824,7 @@ window.cancelDuplicate = function() {
       window.closeDuplicateModal = function() {
         $('#duplicateModal, #duplicateModalBackdrop').remove();
         delete window.confirmDuplicate;
-         delete window.cancelDuplicate;
+        delete window.cancelDuplicate;
         delete window.closeDuplicateModal;
       };
     }
@@ -833,46 +863,42 @@ window.cancelDuplicate = function() {
         .apiListEmployees(true);
     }
 
-    // *** MODIFIED Function: Added month and year parameters ***
-    function loadEmployeeCOCStats(employeeId, month, year) { 
-      if (!employeeId || !month || !year) { // Check for all params
+    function loadEmployeeCOCStats(employeeId, month, year) {
+      if (!employeeId || !month || !year) {
         $('#cocStatsDisplay').addClass('hidden');
         currentEmployeeStats = null;
         return;
       }
 
-      // Show a loading state in the stats box
       $('#cocStatsDisplay').removeClass('hidden');
       $('#currentMonthTotal').text('...');
       $('#monthlyRemaining').text('...');
-      // Title is now part of the HTML, so no need to change it here.
 
       google.script.run
         .withSuccessHandler(function(stats) {
-          console.log(`apiGetEmployeeCOCStats success for ${employeeId}, ${month}/${year}. Received stats:`, stats); // Log received stats
+          console.log(`apiGetEmployeeCOCStats success for ${employeeId}, ${month}/${year}. Received stats:`, stats);
           currentEmployeeStats = stats;
-          $('#currentMonthTotal').text(stats.currentMonthTotal.toFixed(1)); // Use 1 decimal place
-          $('#monthlyRemaining').text(stats.monthlyRemaining.toFixed(1)); // Use 1 decimal place
-          
+          $('#currentMonthTotal').text(stats.currentMonthTotal.toFixed(1));
+          $('#monthlyRemaining').text(stats.monthlyRemaining.toFixed(1));
           validateCOCLimits();
         })
         .withFailureHandler(function(err) {
-          console.error(`apiGetEmployeeCOCStats failure for ${employeeId}, ${month}/${year}:`, err); // Log failure
+          console.error(`apiGetEmployeeCOCStats failure for ${employeeId}, ${month}/${year}:`, err);
           $('#cocStatsDisplay').addClass('hidden');
-          currentEmployeeStats = null; // Clear stats on failure
+          currentEmployeeStats = null;
         })
-        .apiGetEmployeeCOCStats(employeeId, month, year); // <-- Pass month and year
+        .apiGetEmployeeCOCStats(employeeId, month, year);
     }
 
     function updateEmployeeInfo() {
       const empId = $('#employeeSelect').val();
       if (!empId) {
         $('#balanceValue').text('0.0');
-        $('#balanceAvailable').text('120.0'); // Reset available balance
-        $('#employeeInfo').text(''); // Clear employee name from balance card (it's removed, but just in case)
+        $('#balanceAvailable').text('120.0');
         $('#cocStatsDisplay').addClass('hidden');
         $('#existingRecordsBody').empty();
         $('#existingRecordsEmpty').removeClass('hidden').text('Select an employee and month to view recorded entries.');
+        $('#generateMonthlyCertBtn').addClass('hidden').prop('disabled', true); // Hide and disable generate button
         resetStatus();
         return;
       }
@@ -881,29 +907,26 @@ window.cancelDuplicate = function() {
 
       google.script.run
         .withSuccessHandler(function(bal) {
-          console.log(`apiGetBalance success for ${empId}. Received balance:`, bal); // Added log
-          const balance = parseFloat(bal) || 0; // Ensure it's a number
-          const balanceRemaining = 120.0 - balance; // Calculate remaining
-          $('#balanceValue').text(balance.toFixed(1)); // Use 1 decimal place
-          $('#balanceAvailable').text(balanceRemaining.toFixed(1)); // Use 1 decimal place and update available
-          // Removed setting employeeInfo text
+          console.log(`apiGetBalance success for ${empId}. Received balance:`, bal);
+          const balance = parseFloat(bal) || 0;
+          const balanceRemaining = 120.0 - balance;
+          $('#balanceValue').text(balance.toFixed(1));
+          $('#balanceAvailable').text(balanceRemaining.toFixed(1));
 
-          // *** MODIFIED Call: Pass selected month and year ***
           const month = parseInt($('#monthSelect').val(), 10);
           const year = parseInt($('#yearSelect').val(), 10);
-          loadEmployeeCOCStats(empId, month, year); 
-          loadExistingRecords();
+          loadEmployeeCOCStats(empId, month, year);
+          loadExistingRecords(); // Load existing records after balance
         })
         .withFailureHandler(function(err) {
-          console.error(`apiGetBalance failure for ${empId}:`, err); // Added log
+          console.error(`apiGetBalance failure for ${empId}:`, err);
           showModal('Error', err.message || err, 'danger');
-          // Clear dependent fields on balance error too
           $('#balanceValue').text('Error');
           $('#balanceAvailable').text('-');
-          $('#employeeInfo').text(''); // Clear employee name from balance card (it's removed, but just in case)
           $('#cocStatsDisplay').addClass('hidden');
           $('#existingRecordsBody').empty();
           $('#existingRecordsEmpty').removeClass('hidden').text('Error loading balance.');
+          $('#generateMonthlyCertBtn').addClass('hidden').prop('disabled', true);
         })
         .apiGetBalance(empId);
     }
@@ -911,7 +934,7 @@ window.cancelDuplicate = function() {
     function validateCOCLimits() {
       if (!currentEmployeeStats || entries.length === 0) {
         $('#validationWarning').addClass('hidden');
-        $('#validationSuccess').addClass('hidden');
+        $('#validationSuccess').addClass('hidden'); // Ensure success message is hidden too
         return { valid: true };
       }
 
@@ -924,35 +947,29 @@ window.cancelDuplicate = function() {
 
       const errors = [];
 
-      // Use currentEmployeeStats.currentMonthTotal for monthly check
       const newMonthTotal = currentEmployeeStats.currentMonthTotal + totalNewCOC;
       if (newMonthTotal > 40) {
         errors.push(`Monthly limit exceeded: Current ${currentEmployeeStats.currentMonthTotal.toFixed(1)} hrs + New ${totalNewCOC.toFixed(1)} hrs = ${newMonthTotal.toFixed(1)} hrs (Max: 40 hrs/month)`);
       }
 
-       // Use balance from #balanceValue for total balance check
       const currentBalanceFromCard = parseFloat($('#balanceValue').text()) || 0;
       const newTotalBalance = currentBalanceFromCard + totalNewCOC;
       if (newTotalBalance > 120) {
         errors.push(`Total balance limit exceeded: Current ${currentBalanceFromCard.toFixed(1)} hrs + New ${totalNewCOC.toFixed(1)} hrs = ${newTotalBalance.toFixed(1)} hrs (Max: 120 hrs)`);
       }
 
-
       if (errors.length > 0) {
         $('#validationMessage').html(errors.map(e => `• ${e}`).join('<br>'));
         $('#validationWarning').removeClass('hidden');
-        $('#validationSuccess').addClass('hidden');
+        $('#validationSuccess').addClass('hidden'); // Hide success message
         return { valid: false, errors: errors };
-      } else if (totalNewCOC > 0) {
+      } else { // No errors, valid
         $('#validationWarning').addClass('hidden');
-        $('#validationSuccess').removeClass('hidden');
-        return { valid: true };
-      } else {
-        $('#validationWarning').addClass('hidden');
-        $('#validationSuccess').addClass('hidden');
+        $('#validationSuccess').addClass('hidden'); // Hide success message
         return { valid: true };
       }
     }
+
 
     function loadMonthOptions() {
       const months = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -970,14 +987,12 @@ window.cancelDuplicate = function() {
       const now = new Date();
       const currentYear = now.getFullYear();
       let options = '';
-      // Allow years from 2 years ago to 1 year in the future
       for (let y = currentYear - 2; y <= currentYear + 1; y++) {
         options += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
       }
       $('#yearSelect').html(options);
     }
 
-    // *** NEW Function to update month/year display in titles ***
     function updateSelectedMonthYearDisplay() {
         const monthName = $('#monthSelect option:selected').text();
         const year = $('#yearSelect').val();
@@ -987,6 +1002,8 @@ window.cancelDuplicate = function() {
         $('#existingMonthYearDisplay').text(display);
     }
 
+
+    // --- Add/Remove Entry, Calculate, Validate functions remain largely unchanged ---
     function addDayEntry() {
       const employeeId = $('#employeeSelect').val();
       const month = parseInt($('#monthSelect').val(), 10);
@@ -1012,7 +1029,6 @@ window.cancelDuplicate = function() {
         pmIn: '',
         pmOut: '',
         result: null
-        // REMOVED: generateCertificate: false
       };
       entries.push(entry);
 
@@ -1075,7 +1091,6 @@ window.cancelDuplicate = function() {
               </div>
             </div>
           </div>
-          <!-- REMOVED: Generate certificate checkbox -->
         </div>
       `;
 
@@ -1097,6 +1112,7 @@ window.cancelDuplicate = function() {
 
         const dayValidation = validateDayNumber(day, month, year);
         if (!dayValidation.valid) {
+          showModal('Validation Error', dayValidation.message, 'danger'); // Show error in modal
           container.find('.day-type-badge').removeClass('day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday day-type-loading').text('Invalid');
           dayInput.addClass('input-error');
           return;
@@ -1133,7 +1149,6 @@ window.cancelDuplicate = function() {
               .removeClass('day-type-weekday day-type-weekend day-type-regular-holiday day-type-special-holiday')
               .addClass('day-type-loading')
               .text('-');
-            // Ensure input is fully cleared by blurring and refocusing
             dayInput.blur();
             setTimeout(() => dayInput.focus(), 10);
           });
@@ -1161,8 +1176,6 @@ window.cancelDuplicate = function() {
         }
       });
 
-      // REMOVED: .generate-cert listener
-      
       updateEntryCounter();
     }
 
@@ -1233,7 +1246,6 @@ window.cancelDuplicate = function() {
       }
 
       if (!entry.amIn && !entry.amOut && !entry.pmIn && !entry.pmOut) {
-         // Clear results if all times are removed
         container.find('.result-display').addClass('hidden');
         container.find('.hours-worked').text('-');
         container.find('.multiplier').text('-');
@@ -1247,7 +1259,7 @@ window.cancelDuplicate = function() {
       google.script.run
         .withSuccessHandler(function(result) {
           entry.result = result;
-          entry.dayType = result.dayType; // Update dayType based on calculation
+          entry.dayType = result.dayType;
 
           let badgeClass = 'day-type-loading';
           if (result.dayType === 'Weekday') badgeClass = 'day-type-weekday';
@@ -1270,7 +1282,6 @@ window.cancelDuplicate = function() {
         })
         .withFailureHandler(function(err) {
           console.error('Error calculating overtime:', err);
-          // Optionally show an error message in the UI
            container.find('.result-display').addClass('hidden');
            container.find('.hours-worked').text('Error');
            container.find('.multiplier').text('-');
@@ -1322,7 +1333,7 @@ window.cancelDuplicate = function() {
       const hasPM = entry.pmIn || entry.pmOut;
 
       if (!hasAM && !hasPM) {
-        return { valid: true }; // Not an error if completely empty
+        return { valid: true };
       }
 
       if (hasAM && (!entry.amIn || !entry.amOut)) {
@@ -1376,13 +1387,10 @@ window.cancelDuplicate = function() {
         if (pmInMins >= pmOutMins) { container.find('.pm-in, .pm-out').addClass('time-input-error'); return { valid: false, message: 'PM Out time must be after PM In time.' }; }
       }
 
-      // --- NEW VALIDATION ADDED HERE ---
-      // Check if PM In is earlier than AM Out
       if (hasAM && hasPM) {
         const amOutMins = timeToMins(entry.amOut);
         const pmInMins = timeToMins(entry.pmIn);
 
-        // This check ensures we are comparing valid numbers
         if (amOutMins !== null && pmInMins !== null) {
           if (pmInMins < amOutMins) {
             container.find('.am-out').addClass('time-input-error');
@@ -1391,11 +1399,11 @@ window.cancelDuplicate = function() {
           }
         }
       }
-      // --- END OF NEW VALIDATION ---
 
       return { valid: true };
     }
 
+    // --- Status and Loading functions remain unchanged ---
     function resetStatus() {
       const status = $('#existingStatus');
       status.addClass('hidden').removeClass('bg-green-50 border border-green-200 text-green-700 bg-red-50 border-red-200 text-red-700 bg-blue-50 border-blue-200 text-blue-700');
@@ -1415,7 +1423,6 @@ window.cancelDuplicate = function() {
       status.html(message);
     }
 
-    // Store existing dates for duplicate check
     let existingRecordDates = [];
 
     function loadExistingRecords() {
@@ -1425,8 +1432,8 @@ window.cancelDuplicate = function() {
       const year = parseInt($('#yearSelect').val(), 10);
       const body = $('#existingRecordsBody');
       body.empty();
-      $('#generateMonthlyCertBtn').addClass('hidden'); // Hide button by default
-      $('#monthlyCertificateSection').hide(); // Hide certificate section by default
+      $('#generateMonthlyCertBtn').addClass('hidden').prop('disabled', true); // Hide and disable button
+      $('#monthlyCertificateSection').hide();
 
       if (!employeeId || !month || !year) {
         $('#existingRecordsEmpty').removeClass('hidden').text('Select an employee and month to view recorded entries.');
@@ -1435,33 +1442,33 @@ window.cancelDuplicate = function() {
       }
 
       $('#existingRecordsEmpty').addClass('hidden');
-      updateSelectedMonthYearDisplay(); // Update titles
+      updateSelectedMonthYearDisplay();
 
       google.script.run
         .withSuccessHandler(function(records) {
           body.empty();
-          existingRecordDates = []; // Reset
+          existingRecordDates = [];
 
           if (!records || records.length === 0) {
             $('#existingRecordsEmpty').removeClass('hidden').text('No entries recorded for this month yet.');
-            loadMonthlyCertificate(employeeId, month, year); // Still check for certificate
+            $('#generateMonthlyCertBtn').removeClass('hidden').prop('disabled', true); // Show disabled button
+            loadMonthlyCertificate(employeeId, month, year);
             return;
           }
 
-          // Check if there are any uncertificated records
           const hasUncertificatedRecords = records.some(r => !r.certificateUrl);
           if (hasUncertificatedRecords) {
-              $('#generateMonthlyCertBtn').removeClass('hidden');
+              $('#generateMonthlyCertBtn').removeClass('hidden').prop('disabled', false); // Show enabled button
+          } else {
+              $('#generateMonthlyCertBtn').removeClass('hidden').prop('disabled', true); // Show disabled button if all certificated
           }
 
           records.forEach(record => {
-            // Store existing dates for duplicate validation
             existingRecordDates.push(new Date(record.displayDate).getDate());
 
-            // Actions cell - only show for pending records (not yet certificated)
             const actionsCell = !record.certificateUrl
               ? `<div class="flex gap-2 justify-center">
-                   <button class="edit-record-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" data-record-id="${record.recordId}" title="Edit Record">
+                   <button class="edit-record-btn px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50" data-record-id="${record.recordId}" title="Edit Record" disabled>
                      <i class="bi bi-pencil-square"></i> Edit
                    </button>
                    <button class="delete-record-btn px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600" data-record-id="${record.recordId}" title="Delete Record">
@@ -1470,7 +1477,6 @@ window.cancelDuplicate = function() {
                  </div>`
               : '<span class="text-xs text-gray-400 italic">Certificated</span>';
 
-            // Row template (removed certificate column)
             const row = $(`
               <tr>
                 <td class="px-3 py-2">${record.displayDate}</td>
@@ -1480,70 +1486,70 @@ window.cancelDuplicate = function() {
               </tr>
             `);
 
-            // Attach event listeners for Edit and Delete buttons
             row.find('.delete-record-btn').on('click', function() {
               showDeleteRecordModal(record.recordId, record);
             });
 
             row.find('.edit-record-btn').on('click', function() {
-              showModal('Coming Soon', 'Edit functionality will be available soon. For now, you can delete and re-create the record.', 'info');
+              showModal('Info', 'Edit functionality is not yet available. Please delete and re-create the record if needed.', 'info');
             });
 
             body.append(row);
           });
 
-          // Load monthly certificate info
           loadMonthlyCertificate(employeeId, month, year);
         })
         .withFailureHandler(function(error) {
           body.empty();
           $('#existingRecordsEmpty').removeClass('hidden').text('Failed to load records.');
           showStatus(error && error.message ? error.message : String(error), 'error');
+          $('#generateMonthlyCertBtn').addClass('hidden').prop('disabled', true);
         })
         .apiListCOCRecordsForMonth(employeeId, month, year);
     }
 
-    // NEW: Load monthly certificate information
     function loadMonthlyCertificate(employeeId, month, year) {
       google.script.run
         .withSuccessHandler(function(certificate) {
           if (certificate && certificate.certificateId) {
-            // Show certificate section
             $('#monthlyCertificateSection').show();
             $('#noCertificate').hide();
             $('#certificateInfo').show();
 
-            // Populate certificate details
             $('#certIdDisplay').text(certificate.certificateId);
             $('#certTotalDisplay').text(certificate.totalCOC.toFixed(2));
             $('#certIssuedDisplay').text(certificate.issueDate || 'N/A');
             $('#certExpiryDisplay').text(certificate.expirationDate || 'N/A');
-            $('#certViewLink').attr('href', certificate.certificateUrl);
-            $('#certPdfLink').attr('href', certificate.pdfUrl || certificate.certificateUrl);
+            $('#certViewLink').attr('href', certificate.certificateUrl || '#'); // Add fallback
+            $('#certPdfLink').attr('href', certificate.pdfUrl || '#'); // Add fallback
+
+            // Prevent default link behavior if URL is invalid
+            $('#certViewLink, #certPdfLink').off('click').on('click', function(e) {
+                if ($(this).attr('href') === '#') {
+                    e.preventDefault();
+                    showModal('Error', 'Certificate URL is not available.', 'danger');
+                }
+            });
+
           } else {
-            // No certificate yet
             $('#monthlyCertificateSection').show();
             $('#noCertificate').show();
             $('#certificateInfo').hide();
           }
         })
         .withFailureHandler(function(error) {
-          // Hide certificate section on error
           $('#monthlyCertificateSection').hide();
         })
         .apiGetMonthlyCertificate(employeeId, month, year);
     }
 
-    // REMOVED: generateCertificate(recordId, button) function
-
-    // MODIFIED: Function now opens the modal first
+    // --- MODIFIED generateMonthlyCertificate & confirmCertificateGeneration ---
     function generateMonthlyCertificate() {
       const btn = $('#generateMonthlyCertBtn');
       btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Please wait...');
       showIssueDateModal();
     }
 
-    // NEW: This function is called when the user confirms the issue date
     function confirmCertificateGeneration() {
       const employeeId = $('#employeeSelect').val();
       const month = parseInt($('#monthSelect').val(), 10);
@@ -1564,30 +1570,33 @@ window.cancelDuplicate = function() {
 
       const btn = $('#generateMonthlyCertBtn');
       btn.prop('disabled', true).html('<i class="bi bi-arrow-repeat animate-spin"></i> Generating...');
-      closeIssueDateModal(); // Close the date modal
+      closeIssueDateModal();
+      showPdfSpinner(); // Show spinner
       resetStatus();
-  
+
       google.script.run
         .withSuccessHandler(function(result) {
-          // Assuming result = { certificateId: "CERT-...", numRecords: 3, totalHours: 11.0 }
+          hidePdfSpinner(); // Hide spinner on success
           if (result && result.certificateId) {
             showStatus(`Successfully generated Certificate ${result.certificateId} for ${result.numRecords} ${result.numRecords === 1 ? 'entry' : 'entries'}, totaling ${result.totalHours.toFixed(1)} hours.`, 'success');
-            btn.addClass('hidden'); // Hide button since it's now generated
-            loadExistingRecords(); // Refresh the table to show new cert links
-            updateEmployeeInfo(); // Refresh balance/stats just in case
+            btn.addClass('hidden');
+            loadExistingRecords();
+            updateEmployeeInfo();
           } else {
             btn.prop('disabled', false).html('<i class="bi bi-file-earmark-plus"></i> Generate Monthly Certificate');
             showStatus('Certificate generated but no details were returned. Please refresh.', 'warning');
           }
         })
         .withFailureHandler(function(error) {
+          hidePdfSpinner(); // Hide spinner on failure
           btn.prop('disabled', false).html('<i class="bi bi-file-earmark-plus"></i> Generate Monthly Certificate');
           showStatus(error && error.message ? error.message : String(error), 'error');
         })
-        .apiGenerateMonthlyCOCCertificate(employeeId, month, year, issueDate); // Pass new issueDate
+        .apiGenerateMonthlyCOCCertificate(employeeId, month, year, issueDate);
     }
 
 
+    // --- submitEntries function remains unchanged ---
     function submitEntries() {
       const employeeId = $('#employeeSelect').val();
       const month = parseInt($('#monthSelect').val(), 10);
@@ -1607,13 +1616,13 @@ window.cancelDuplicate = function() {
       $('.time-input-error').removeClass('time-input-error');
 
       const payload = [];
-      let validationFailed = false; // Flag to stop iteration on first error
+      let validationFailed = false;
 
       for (const ent of entries) {
         if (!ent.day || isNaN(ent.day)) {
           showModal('Validation Error', 'One of the day entries has no day number.', 'danger');
           validationFailed = true;
-          break; // Stop checking further entries
+          break;
         }
 
         const container = $(`.day-entry-row[data-entry-id="${ent.id}"]`);
@@ -1622,10 +1631,9 @@ window.cancelDuplicate = function() {
           showModal('Validation Error', `Day ${ent.day}: ${validation.message}`, 'danger');
           container[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
           validationFailed = true;
-          break; // Stop checking further entries
+          break;
         }
 
-        // Only push if there are valid time entries for calculation
         if ( (ent.amIn && ent.amOut) || (ent.pmIn && ent.pmOut) ) {
             payload.push({
                 day: ent.day,
@@ -1633,12 +1641,10 @@ window.cancelDuplicate = function() {
                 amOut: ent.amOut || '',
                 pmIn: ent.pmIn || '',
                 pmOut: ent.pmOut || ''
-                // REMOVED: generateCertificate: Boolean(ent.generateCertificate)
             });
         }
       }
 
-      // If validation failed in the loop, stop submission
       if (validationFailed) {
           return;
       }
@@ -1648,13 +1654,11 @@ window.cancelDuplicate = function() {
         return;
       }
 
-
       const submitBtn = $('#submitBtn');
       submitBtn.prop('disabled', true).html('<i class="bi bi-arrow-repeat animate-spin"></i> Submitting...');
 
       google.script.run
-      .withSuccessHandler(function(res) {
-          // MODIFIED: Success message to reflect new workflow
+        .withSuccessHandler(function(res) {
           const successMessage = `
             <div class="space-y-3">
               <p class="text-base">Successfully recorded <span class="font-bold text-green-600">${res.added}</span> overtime ${res.added === 1 ? 'entry' : 'entries'}.</p>
@@ -1668,7 +1672,7 @@ window.cancelDuplicate = function() {
             </div>
           `;
           showModal('Success', successMessage, 'success');
-          submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Submit');
+          submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Submit Entries'); // Changed button text back
 
           entries.length = 0;
           entryCounter = 0;
@@ -1678,33 +1682,30 @@ window.cancelDuplicate = function() {
           updateEntryCounter();
           validateCOCLimits();
 
-          updateEmployeeInfo(); // Refresh balance and stats after submission
+          updateEmployeeInfo();
 
           window.scrollTo({ top: 0, behavior: 'smooth' });
-
         })
         .withFailureHandler(function(err) {
-          // Display the actual error message from the server
           showModal('Error Submitting Entries', err.message || 'An unknown error occurred.', 'danger');
-          submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Submit');
+          submitBtn.prop('disabled', false).html('<i class="bi bi-check-circle"></i> Submit Entries'); // Changed button text back
         })
-        .apiRecordCOC(employeeId, month, year, payload); // Use the filtered payload
+        .apiRecordCOC(employeeId, month, year, payload);
     }
 
-
+    // --- Back to Dashboard function remains unchanged ---
     function backToDashboard() {
-      // MODIFIED: This function should just close the modal.
-      // Your onOpen menu is the "dashboard".
       if (typeof google !== "undefined" && google.script && google.script.host) {
         google.script.host.close();
       }
     }
 
+    // --- Initialization logic remains unchanged ---
     window.onload = function() {
       loadEmployees();
       loadYearOptions();
       loadMonthOptions();
-      updateSelectedMonthYearDisplay(); // Initial update for titles
+      updateSelectedMonthYearDisplay();
 
       setTimeout(function() {
         $('#monthSelect').select2({
@@ -1720,10 +1721,9 @@ window.cancelDuplicate = function() {
         }).data('prev', $('#yearSelect').val());
       }, 100);
 
-      // *** MODIFIED 'change' Handler ***
       $('#monthSelect, #yearSelect').on('change', function() {
-          updateSelectedMonthYearDisplay(); // Update titles on change
-          const empId = $('#employeeSelect').val(); // Get employee ID
+          updateSelectedMonthYearDisplay();
+          const empId = $('#employeeSelect').val();
 
           if (entries.length > 0) {
             const monthName = $('#monthSelect option:selected').text();
@@ -1731,7 +1731,7 @@ window.cancelDuplicate = function() {
             const changedSelect = $(this);
             const prevMonth = changedSelect.attr('id') === 'monthSelect' ? changedSelect.data('prev') : $('#monthSelect').val();
             const prevYear = changedSelect.attr('id') === 'yearSelect' ? changedSelect.data('prev') : $('#yearSelect').val();
-  
+
             showConfirmModal(
               'Change Month/Year',
               `Changing to <strong>${monthName} ${year}</strong> will clear all current day entries. Continue?`,
@@ -1745,9 +1745,9 @@ window.cancelDuplicate = function() {
                 validateCOCLimits();
                 $('#monthSelect').data('prev', $('#monthSelect').val());
                 $('#yearSelect').data('prev', $('#yearSelect').val());
-                
-                loadExistingRecords(); // Reload existing records
-                if(empId) { // Load stats for new month/year
+
+                loadExistingRecords();
+                if(empId) {
                     loadEmployeeCOCStats(empId, parseInt($('#monthSelect').val(), 10), parseInt($('#yearSelect').val(), 10));
                 }
               },
@@ -1757,14 +1757,14 @@ window.cancelDuplicate = function() {
                 } else {
                   changedSelect.val(prevYear).trigger('change.select2');
                 }
-                updateSelectedMonthYearDisplay(); // Revert title display if cancelled
+                updateSelectedMonthYearDisplay();
               }
             );
           } else {
             $('#monthSelect').data('prev', $('#monthSelect').val());
             $('#yearSelect').data('prev', $('#yearSelect').val());
-            loadExistingRecords(); // Load records for the new month/year
-            if(empId) { // Load stats for new month/year
+            loadExistingRecords();
+            if(empId) {
               loadEmployeeCOCStats(empId, parseInt($('#monthSelect').val(), 10), parseInt($('#yearSelect').val(), 10));
             }
           }
@@ -1772,29 +1772,25 @@ window.cancelDuplicate = function() {
 
       $('#employeeSelect').on('change', updateEmployeeInfo);
       $('#addDayBtn').on('click', addDayEntry);
-      $('#cancelBtn').on('click', function() {
+      $('#cancelBtn').on('click', function() { // Modified Cancel button
         if (typeof google !== "undefined" && google.script && google.script.host) {
           google.script.host.close();
         }
       });
-      $('#submitBtn').on('click', submitEntries);
+      $('#submitBtn').on('click', submitEntries); // Modified Submit button
       $('#backToDashboardBtn').on('click', backToDashboard);
       $('#refreshExistingBtn').on('click', loadExistingRecords);
-      $('#generateMonthlyCertBtn').on('click', generateMonthlyCertificate); // MODIFIED: Listener now calls modal
-      
-      // REMOVED: Settings Button Listener
+      $('#generateMonthlyCertBtn').on('click', generateMonthlyCertificate);
 
       $('#closeModalBtn, #modalOkBtn').on('click', closeModal);
-      $('#closeConfirmModalBtn').on('click', closeConfirmModal);
+      $('#closeConfirmModalBtn').on('click', closeConfirmModal); // Use correct ID
       $('#modalBackdrop').on('click', closeModal);
-      $('#confirmModalBackdrop').on('click', closeConfirmModal);
+      $('#confirmModalBackdrop').on('click', closeConfirmModal); // Use correct ID
 
-      // NEW: Listeners for Issue Date Modal
       $('#closeIssueDateModalBtn, #issueDateCancelBtn').on('click', closeIssueDateModal);
       $('#issueDateConfirmBtn').on('click', confirmCertificateGeneration);
       $('#issueDateModalBackdrop').on('click', closeIssueDateModal);
 
-      // NEW: Listeners for Delete Record Modal
       $('#closeDeleteRecordModalBtn, #deleteRecordCancelBtn').on('click', closeDeleteRecordModal);
       $('#deleteRecordConfirmBtn').on('click', confirmDeleteRecord);
       $('#deleteRecordModalBackdrop').on('click', closeDeleteRecordModal);
@@ -1805,5 +1801,3 @@ window.cancelDuplicate = function() {
 
 </body>
 </html>
-
-
