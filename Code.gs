@@ -6938,21 +6938,41 @@ function apiGenerateMonthlyCOCCertificate(employeeId, month, year, issueDateStri
 }
 
 /**
+ * =================================================================
+ * CODE.GS CORRECTION - REPLACE THIS FUNCTION
+ * =================================================================
+ * This version correctly reads the template ID from the Settings sheet.
+ */
+
+/**
  * Helper function to create the Google Doc certificate.
  */
 function generateCertificateDocument(certificateId, empDetails, records, issueDate, expirationDate) {
   try {
-    // Get template ID from Settings sheet
-    const settings = getSheetDataNoHeader('Settings');
-    const templateRow = settings.find(r => r[0] === 'COC_CERTIFICATE_TEMPLATE_ID');
-    const templateId = templateRow ? templateRow[1] : null;
+    // Get settings data
+    const settingsData = getSheetDataNoHeader('Settings'); // Assuming you have getSheetDataNoHeader
 
-    if (!templateId || templateId === 'YOUR_TEMPLATE_ID_HERE' || !templateId.trim()) {
+    // Find the template ID in settings
+    const templateRow = settingsData.find(r => r[0] === 'COC_CERTIFICATE_TEMPLATE_ID');
+    const templateId = templateRow ? String(templateRow[1]).trim() : null; // Get value from 2nd column (index 1) and trim
+
+    if (!templateId) {
+      Logger.log("ERROR: Certificate Template ID (COC_CERTIFICATE_TEMPLATE_ID) not found or empty in the Settings sheet.");
       throw new Error("Certificate Template ID not configured. Please set COC_CERTIFICATE_TEMPLATE_ID in the Settings sheet.");
     }
+    Logger.log("Using Template ID: " + templateId);
 
-    const templateFile = DriveApp.getFileById(templateId);
-    
+    // Check if template file exists and is accessible
+    let templateFile;
+    try {
+      templateFile = DriveApp.getFileById(templateId);
+      // Attempt a simple operation to check permissions
+      templateFile.getName();
+    } catch (e) {
+      Logger.log("ERROR accessing template file ID: " + templateId + ". Error: " + e.message);
+      throw new Error("Could not access the Certificate Template (ID: " + templateId + "). Please ensure the ID is correct and the script has permission to access it.");
+    }
+
     // Create a copy
     const newFileName = `COC Certificate - ${empDetails.fullName} - ${certificateId}`;
     const newFile = templateFile.makeCopy(newFileName);
@@ -6965,47 +6985,68 @@ function generateCertificateDocument(certificateId, empDetails, records, issueDa
     const issueDateFormatted = formatLongDate(issueDate);
     const expiryDateFormatted = formatLongDate(expirationDate);
 
-    // *** MODIFIED: Get signatories dynamically from "Signatories" sheet ***
-    const getSetting = (key) => {
-      const row = settings.find(r => r[0] === key);
-      return row ? row[1] : `[${key} not found]`;
+    // Get signatories dynamically from settings
+    const getSetting = (key, defaultValue = `[${key} not found]`) => {
+      const row = settingsData.find(r => r[0] === key);
+      return row ? row[1] : defaultValue;
     };
 
     const issuedByName = getSetting("SIGNATORY_ISSUED_BY_NAME");
     const issuedByPosition = getSetting("SIGNATORY_ISSUED_BY_POSITION");
-    // REMOVED: notedByName and notedByPosition
-    // *** END OF MODIFICATION ***
 
     // Replace placeholders
     body.replaceText("{{EMPLOYEE_NAME}}", empDetails.fullName.toUpperCase());
     body.replaceText("{{POSITION}}", empDetails.position);
     body.replaceText("{{OFFICE}}", empDetails.office);
-    body.replaceText("{{TOTAL_COC}}", totalCOC.toFixed(1)); // Use 1 decimal place
+    body.replaceText("{{TOTAL_COC}}", totalCOC.toFixed(1));
     body.replaceText("{{INCLUSIVE_DATES}}", inclusiveDates);
     body.replaceText("{{ISSUE_DATE_FORMATTED}}", issueDateFormatted);
     body.replaceText("{{EXPIRY_DATE_FORMATTED}}", expiryDateFormatted);
     body.replaceText("{{ISSUED_BY_NAME}}", issuedByName.toUpperCase());
     body.replaceText("{{ISSUED_BY_POSITION}}", issuedByPosition);
-    // REMOVED: notedBy replaceText calls
-    body.replaceText("{{CERTIFICATE_ID}}", certificateId); // Add this if you have a placeholder for it
+    body.replaceText("{{CERTIFICATE_ID}}", certificateId);
 
     doc.saveAndClose();
 
     // Set permissions to "anyone with link can view"
     newFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    
-    const pdfBlob = newFile.getAs('application/pdf');
-    const pdfFile = DriveApp.createFile(pdfBlob).setName(newFileName + ".pdf");
-    pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    Logger.log("Document created and shared: " + newFile.getUrl());
+
+    // Generate PDF
+    let pdfFile, pdfUrl;
+    try {
+      const pdfBlob = newFile.getAs('application/pdf');
+      pdfFile = DriveApp.createFile(pdfBlob).setName(newFileName + ".pdf");
+      pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      pdfUrl = pdfFile.getUrl(); // Use the standard URL
+       // pdfUrl = `https://drive.google.com/uc?export=download&id=${pdfFile.getId()}`; // Alternative download link
+      Logger.log("PDF created and shared: " + pdfUrl);
+    } catch (pdfError) {
+        Logger.log("ERROR generating or sharing PDF: " + pdfError.message);
+        pdfUrl = null; // Set PDF URL to null if generation fails
+    }
 
 
     return {
       url: newFile.getUrl(),
-      pdfUrl: pdfFile.getUrl()
+      pdfUrl: pdfUrl // Return the generated (or null) PDF URL
     };
 
   } catch (e) {
-    Logger.log(`Error in generateCertificateDocument: ${e}`);
+    Logger.log(`Error in generateCertificateDocument: ${e}\nStack: ${e.stack}`);
+    // Try to clean up the copied file if it exists
+    try {
+      if (newFile) {
+        DriveApp.getFileById(newFile.getId()).setTrashed(true);
+        Logger.log("Cleaned up potentially created document file.");
+      }
+      if (pdfFile) {
+         DriveApp.getFileById(pdfFile.getId()).setTrashed(true);
+         Logger.log("Cleaned up potentially created PDF file.");
+      }
+    } catch (cleanupError) {
+      Logger.log("Error during cleanup: " + cleanupError.message);
+    }
     throw new Error(`Failed to create document: ${e.message}`);
   }
 }
