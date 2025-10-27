@@ -139,6 +139,8 @@ function migrateCOCRecordsMonthYear() {
     const data = recordsSheet.getDataRange().getValues();
     let updatedCount = 0;
 
+    Logger.log(`Starting migration. Total rows: ${data.length}`);
+
     // Start from row 2 (index 1) to skip header
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
@@ -156,6 +158,8 @@ function migrateCOCRecordsMonthYear() {
           // Update the MONTH_YEAR column (column D, which is column 4, index 3+1)
           recordsSheet.getRange(i + 1, RECORD_COLS.MONTH_YEAR + 1).setValue(monthYear);
           updatedCount++;
+
+          Logger.log(`Row ${i + 1}: Set MONTH_YEAR to ${monthYear} for date ${date}`);
         }
       }
     }
@@ -166,6 +170,66 @@ function migrateCOCRecordsMonthYear() {
   } catch (e) {
     Logger.log(`Error in migrateCOCRecordsMonthYear: ${e}`);
     return { success: false, message: e.message };
+  }
+}
+
+/**
+ * DEBUG FUNCTION: Check what data exists for a specific employee and month
+ * This helps diagnose why records aren't showing
+ */
+function debugCOCRecords(employeeId, month, year) {
+  try {
+    const db = SpreadsheetApp.openById(DATABASE_ID);
+    const recordsSheet = db.getSheetByName('COC_Records');
+    const data = recordsSheet.getDataRange().getValues();
+
+    const monthYear = `${year}-${String(month).padStart(2, '0')}`;
+
+    Logger.log('=== DEBUG COC RECORDS ===');
+    Logger.log(`Looking for: Employee ID = "${employeeId}", Month/Year = "${monthYear}"`);
+    Logger.log(`Total rows in sheet: ${data.length}`);
+    Logger.log('');
+
+    // Check header
+    Logger.log('Headers:');
+    Logger.log(data[0]);
+    Logger.log('');
+
+    let matchingRecords = 0;
+    let recordsForEmployee = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rowEmpId = row[RECORD_COLS.EMPLOYEE_ID];
+      const rowMonthYear = row[RECORD_COLS.MONTH_YEAR];
+      const rowStatus = row[RECORD_COLS.STATUS];
+      const rowDate = row[RECORD_COLS.DATE_RENDERED];
+
+      // Count all records for this employee
+      if (rowEmpId === employeeId) {
+        recordsForEmployee++;
+        Logger.log(`Row ${i + 1}: EmpID="${rowEmpId}", MonthYear="${rowMonthYear}", Status="${rowStatus}", Date="${rowDate}"`);
+
+        // Check if it matches our filter
+        if (rowMonthYear === monthYear) {
+          matchingRecords++;
+          Logger.log(`  ^^^ MATCHES! ^^^`);
+        }
+      }
+    }
+
+    Logger.log('');
+    Logger.log(`Summary: Found ${recordsForEmployee} total records for employee ${employeeId}`);
+    Logger.log(`Found ${matchingRecords} records matching month/year ${monthYear}`);
+
+    return {
+      totalRecordsForEmployee: recordsForEmployee,
+      matchingRecords: matchingRecords
+    };
+
+  } catch (e) {
+    Logger.log(`Error in debugCOCRecords: ${e}`);
+    return { error: e.message };
   }
 }
 
@@ -3243,7 +3307,8 @@ function onOpen() {
     .addItem('Reports', 'showReports')
     .addSeparator()
     .addSubMenu(ui.createMenu('Admin Tools')
-      .addItem('Run Data Migration (MONTH_YEAR)', 'runCOCRecordsMigration'))
+      .addItem('Run Data Migration (MONTH_YEAR)', 'runCOCRecordsMigration')
+      .addItem('Debug COC Records', 'debugMariaOctober2025'))
     .addToUi();
 }
 
@@ -3262,12 +3327,45 @@ function runCOCRecordsMigration() {
     try {
       const result = migrateCOCRecordsMonthYear();
       if (result.success) {
-        ui.alert('Migration Complete', `Successfully updated ${result.updatedCount} records.`, ui.ButtonSet.OK);
+        ui.alert('Migration Complete', `Successfully updated ${result.updatedCount} records.\n\nPlease check the Execution log (View > Execution log) for details.`, ui.ButtonSet.OK);
       } else {
         ui.alert('Migration Failed', result.message || 'An unknown error occurred.', ui.ButtonSet.OK);
       }
     } catch (e) {
       ui.alert('Migration Error', e.message || String(e), ui.ButtonSet.OK);
+    }
+  }
+}
+
+/**
+ * Menu function to debug COC records for Maria L Garcia in October 2025
+ * This helps diagnose the "No entries recorded" issue
+ */
+function debugMariaOctober2025() {
+  const ui = SpreadsheetApp.getUi();
+
+  // Get Maria's employee ID - you may need to adjust this
+  const employeeId = ui.prompt(
+    'Enter Employee ID',
+    'Enter the Employee ID to debug (e.g., EMP001):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (employeeId.getSelectedButton() === ui.Button.OK) {
+    const empId = employeeId.getResponseText();
+
+    try {
+      // Run debug function
+      const result = debugCOCRecords(empId, 10, 2025);
+
+      const message = `Debug Results:\n\n` +
+        `Total records for ${empId}: ${result.totalRecordsForEmployee}\n` +
+        `Matching October 2025: ${result.matchingRecords}\n\n` +
+        `Check the Execution log (View > Execution log) for detailed information.`;
+
+      ui.alert('Debug Complete', message, ui.ButtonSet.OK);
+    } catch (e) {
+      ui.alert('Debug Error', e.message || String(e), ui.ButtonSet.OK);
     }
   }
 }
@@ -6461,11 +6559,14 @@ const COC_CERTIFICATE_TEMPLATE_ID = 'YOUR_TEMPLATE_ID_HERE';
  */
 function apiListCOCRecordsForMonth(employeeId, month, year) {
   if (!employeeId || !month || !year) throw new Error("Employee ID, month, and year are required.");
-  
+
   try {
     const monthYear = `${year}-${String(month).padStart(2, '0')}`;
     const recordsData = getSheetDataNoHeader('COC_Records');
     const certsData = getSheetDataNoHeader('COC_Certificates');
+
+    Logger.log(`apiListCOCRecordsForMonth: Searching for empId="${employeeId}", month=${month}, year=${year}, monthYear="${monthYear}"`);
+    Logger.log(`Total records in sheet: ${recordsData.length}`);
 
     // Create a map of Certificate IDs to their URLs for easy lookup
     const certMap = new Map();
@@ -6476,10 +6577,24 @@ function apiListCOCRecordsForMonth(employeeId, month, year) {
       });
     });
 
-    const employeeMonthRecords = recordsData.filter(r => 
-      r[RECORD_COLS.EMPLOYEE_ID] === employeeId && 
-      r[RECORD_COLS.MONTH_YEAR] === monthYear
-    );
+    // Filter records - EXCLUDE CANCELLED status
+    const employeeMonthRecords = recordsData.filter(r => {
+      const rowEmpId = String(r[RECORD_COLS.EMPLOYEE_ID] || '').trim();
+      const rowMonthYear = String(r[RECORD_COLS.MONTH_YEAR] || '').trim();
+      const rowStatus = String(r[RECORD_COLS.STATUS] || '').trim();
+
+      const empMatch = rowEmpId === employeeId;
+      const monthMatch = rowMonthYear === monthYear;
+      const notCancelled = rowStatus !== STATUS_CANCELLED;
+
+      if (empMatch) {
+        Logger.log(`  Row: empId="${rowEmpId}", monthYear="${rowMonthYear}", status="${rowStatus}", matches=${empMatch && monthMatch && notCancelled}`);
+      }
+
+      return empMatch && monthMatch && notCancelled;
+    });
+
+    Logger.log(`Found ${employeeMonthRecords.length} matching records`);
 
     // Format the records for the client
     const formattedRecords = employeeMonthRecords.map(r => {
